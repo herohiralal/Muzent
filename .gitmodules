@@ -1,3 +1,4 @@
 [submodule "Source/Dependencies/Panshilar"]
 	path = Source/Dependencies/Panshilar
 	url = git@github.com:herohiralal/Panshilar.git
+	branch = main
