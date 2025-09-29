@@ -36,7 +36,6 @@ PNSLR_SUPPRESS_WARN
         #define VK_USE_PLATFORM_XLIB_KHR
     #endif
 
-    #define VK_NO_PROTOTYPES
     #ifndef __cplusplus
         #define VOLK_IMPLEMENTATION
     #endif

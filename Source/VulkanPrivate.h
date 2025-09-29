@@ -1,11 +1,14 @@
-#if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
+#if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN && !defined(MZNT_VULKAN_PRIVATE_H)
+#define MZNT_VULKAN_PRIVATE_H
 #include "__Prelude.h"
 #include "Renderer.h"
 EXTERN_C_BEGIN
 
 typedef struct MZNT_VulkanRenderer
 {
-    MZNT_Renderer parent;
+    MZNT_Renderer    parent;
+    VkInstance       instance;
+    VkPhysicalDevice physicalDevice;
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config);
