@@ -7,7 +7,7 @@
 #define MZNT_RHI_ARG_PASS_DYNA(ty, arg, api) (MZNT_##api##ty*) arg
 
 #define MZNT_RHI_ARG_DECL_STAT(ty) ty
-#define MZNT_RHI_ARG_DECL_DYNA(ty) MZNT_##ty##*
+#define MZNT_RHI_ARG_DECL_DYNA(ty) MZNT_##ty*
 
 #define MZNT_RHI_RET_START_STAT /*nothing*/
 #define MZNT_RHI_RET_START_DYNA &(
