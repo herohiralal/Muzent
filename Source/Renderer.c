@@ -17,12 +17,12 @@
 
 #define MZNT_RHI_ARG_CHECK_STAT(tyQ, arg) /*nothing*/
 #if PNSLR_DBG
-    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) FORCE_DBG_TRAP; } while (0)
+    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) PNSLR_LogE(PNSLR_StringLiteral("Arg mismatch: " #arg " doesn't match " #tyQ "."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; } while (0)
 #else
     #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) /*nothing*/
 #endif
 
-#define MZNT_RHI_FN_NULL_BRANCH(tyRet, fn, ...)     case MZNT_RendererType_Null:     return MZNT_RHI_RET_START_##tyRet MZNT_##fn##_Null       ( __VA_ARGS__ ) MZNT_RHI_RET_END_##tyRet;
+#define MZNT_RHI_FN_NULL_BRANCH(ret)                case MZNT_RendererType_Null:     return (ret) {0};
 
 #if MZNT_VULKAN
     #define MZNT_RHI_FN_VK_BRANCH(tyRet, fn, ...)   case MZNT_RendererType_Vulkan:   return MZNT_RHI_RET_START_##tyRet MZNT_##fn##_Vulkan     ( __VA_ARGS__ ) MZNT_RHI_RET_END_##tyRet;
@@ -42,64 +42,66 @@
     #define MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, ...)
 #endif
 
+#define MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret)          default: PNSLR_LogE(PNSLR_StringLiteral("Unsupported renderer type."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; return (ret) {0};
+
 #define MZNT_RHI_SWITCH_ONE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_SWITCH_TWO_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_SWITCH_THREE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Null     ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, DirectX12), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Metal    ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_SWITCH_FOUR_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Null     ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Null     ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, DirectX12), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, DirectX12), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Metal    ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Metal    ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_SWITCH_FIVE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Null     ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Null     ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Null     ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, DirectX12), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, DirectX12), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, DirectX12), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Metal    ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Metal    ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Metal    ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_SWITCH_SIX_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5, ty6, arg6, tyArg6) \
     switch (tyQ) \
     { \
-        MZNT_RHI_FN_NULL_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Null     ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Null     ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Null     ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Null     ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Null     ), MZNT_RHI_ARG_PASS_##tyArg6 (ty6, arg6, Null     ))) \
+        MZNT_RHI_FN_NULL_BRANCH(ret) \
         MZNT_RHI_FN_VK_BRANCH   (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Vulkan   ), MZNT_RHI_ARG_PASS_##tyArg6 (ty6, arg6, Vulkan   ))) \
         MZNT_RHI_FN_DX12_BRANCH (tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, DirectX12), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, DirectX12), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, DirectX12), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, DirectX12), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, DirectX12), MZNT_RHI_ARG_PASS_##tyArg6 (ty6, arg6, DirectX12))) \
         MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, (MZNT_RHI_ARG_PASS_##tyArg1 (ty1, arg1, Metal    ), MZNT_RHI_ARG_PASS_##tyArg2 (ty2, arg2, Metal    ), MZNT_RHI_ARG_PASS_##tyArg3 (ty3, arg3, Metal    ), MZNT_RHI_ARG_PASS_##tyArg4 (ty4, arg4, Metal    ), MZNT_RHI_ARG_PASS_##tyArg5 (ty5, arg5, Metal    ), MZNT_RHI_ARG_PASS_##tyArg6 (ty6, arg6, Metal    ))) \
-        default: return (ret) {0}; \
+        MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
 #define MZNT_RHI_FN_ONE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1) \
@@ -187,6 +189,7 @@ MZNT_RHI_FN_ONE_ARG(
 #undef MZNT_RHI_SWITCH_THREE_ARG
 #undef MZNT_RHI_SWITCH_TWO_ARG
 #undef MZNT_RHI_SWITCH_ONE_ARG
+#undef MZNT_RHI_FN_UNSUPPORTED_BRANCH
 #undef MZNT_RHI_FN_METAL_BRANCH
 #undef MZNT_RHI_FN_DX12_BRANCH
 #undef MZNT_RHI_FN_VK_BRANCH
