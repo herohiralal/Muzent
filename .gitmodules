@@ -2,3 +2,7 @@
 	path = Source/Dependencies/Panshilar
 	url = git@github.com:herohiralal/Panshilar.git
 	branch = main
+[submodule "Source/Dependencies/volk"]
+	path = Source/Dependencies/volk
+	url = git@github.com:zeux/volk.git
+	branch = main
