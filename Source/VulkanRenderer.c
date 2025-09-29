@@ -5,6 +5,8 @@
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config)
 {
     MZNT_VulkanRenderer* output = PNSLR_New(MZNT_VulkanRenderer, config.allocator, PNSLR_GET_LOC(), nil);
+    output->parent.type      = MZNT_RendererType_Vulkan;
+    output->parent.allocator = config.allocator;
 
     volkInitialize();
 

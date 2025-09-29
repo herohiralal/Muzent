@@ -17,7 +17,7 @@
 
 #define MZNT_RHI_ARG_CHECK_STAT(tyQ, arg) /*nothing*/
 #if PNSLR_DBG
-    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) PNSLR_LogE(PNSLR_StringLiteral("Arg mismatch: " #arg " doesn't match " #tyQ "."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; } while (0)
+    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) { PNSLR_LogE(PNSLR_StringLiteral("Arg mismatch: " #arg " doesn't match " #tyQ "."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; } } while (0)
 #else
     #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) /*nothing*/
 #endif
