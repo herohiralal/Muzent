@@ -1,0 +1,8 @@
+#ifndef MZNT_UNITY_CXX
+#define MZNT_UNITY_CXX
+
+#define PNSLR_IMPLEMENTATION
+#define MZNT_IMPLEMENTATION
+#include "Muzent.h"
+
+#endif//MZNT_UNITYCXX
