@@ -92,5 +92,20 @@ b8 MZNT_DestroyRendererSurface(MZNT_RendererSurface* surface, PNSLR_Allocator te
  */
 b8 MZNT_ResizeRendererSurface(MZNT_RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
 
+typedef struct MZNT_RendererCommandBuffer
+{
+    MZNT_RendererType type;
+} MZNT_RendererCommandBuffer;
+
+/**
+ * Creates a command buffer for the given renderer.
+ */
+MZNT_RendererCommandBuffer* MZNT_CreateRendererCommandBuffer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
+
+/**
+ * Destroys the given command buffer and frees associated resources.
+ */
+b8 MZNT_DestroyRendererCommandBuffer(MZNT_RendererCommandBuffer* commandBuffer, PNSLR_Allocator tempAllocator);
+
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================

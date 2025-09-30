@@ -454,23 +454,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRendere
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
-    VkCommandPoolCreateInfo cmdPoolCI = {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolCI, nil, &(output->cmdPool)));
-
-    VkCommandBufferAllocateInfo cmdBufAI = {
-        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = output->cmdPool,
-        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->cmdBuffer)));
-
     return output;
 }
 
@@ -478,11 +461,6 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 {
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
-
-    vkFreeCommandBuffers(surface->renderer->device, surface->cmdPool, 1, &(surface->cmdBuffer));
-    vkDestroyCommandPool(surface->renderer->device, surface->cmdPool, nil);
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
@@ -545,4 +523,50 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
     return true;
 }
+
+MZNT_VulkanRendererCommandBuffer* MZNT_CreateRendererCommandBuffer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator)
+{
+    if (!renderer) return nil;
+
+    MZNT_VulkanRendererCommandBuffer* output = PNSLR_New(MZNT_VulkanRendererCommandBuffer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    if (!output) FORCE_DBG_TRAP;
+
+    output->parent.type = MZNT_RendererType_Vulkan;
+    output->renderer    = renderer;
+
+    VkCommandPoolCreateInfo cmdPoolCI = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolCI, nil, &(output->cmdPool)));
+
+    VkCommandBufferAllocateInfo cmdBufAI = {
+        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool        = output->cmdPool,
+        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->cmdBuffer)));
+
+    return output;
+}
+
+b8 MZNT_DestroyRendererCommandBuffer_Vulkan(MZNT_VulkanRendererCommandBuffer* commandBuffer, PNSLR_Allocator tempAllocator)
+{
+    if (!commandBuffer) return false;
+    if (!commandBuffer->renderer) FORCE_DBG_TRAP;
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(commandBuffer->renderer->device));
+
+    vkFreeCommandBuffers(commandBuffer->renderer->device, commandBuffer->cmdPool, 1, &(commandBuffer->cmdBuffer));
+    vkDestroyCommandPool(commandBuffer->renderer->device, commandBuffer->cmdPool, nil);
+
+    PNSLR_Delete(commandBuffer, commandBuffer->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    return true;
+}
+
 #endif

@@ -201,6 +201,20 @@ MZNT_RHI_FN_FOUR_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+MZNT_RHI_FN_TWO_ARG(
+    MZNT_RendererCommandBuffer*, DYNA,
+    CreateRendererCommandBuffer, (renderer ? renderer->type : 0),
+    Renderer, renderer, DYNA,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
+MZNT_RHI_FN_TWO_ARG(
+    b8, STAT,
+    DestroyRendererCommandBuffer, (commandBuffer ? commandBuffer->type : 0),
+    RendererCommandBuffer, commandBuffer, DYNA,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
 // macro bs ===================================================================================================================
 
 #undef MZNT_RHI_FN_SIX_ARG
