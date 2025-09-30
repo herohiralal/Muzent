@@ -1,8 +1,9 @@
 #define MZNT_IMPLEMENTATION
 #include "RendererPrivate.h"
+#include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
-static inline void MZNT_Internal_LogResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
+static inline void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
 {
     utf8str message = {0};
     // chatgpt generated
@@ -75,10 +76,10 @@ static inline void MZNT_Internal_LogResultOnFailure(VkResult result, utf8str fnC
 }
 
 #define MZNT_INTERNAL_VK_CHECKED_CALL(call) \
-    MZNT_Internal_LogResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())
+    MZNT_Internal_LogVkResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())
 
 // returns number of unique queues
-PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectQueueFamilies(VkPhysicalDevice physDev, VkSurfaceKHR surfaceToPresent, u32* gfxQueue, u32* presQueue, PNSLR_Allocator tempAllocator)
+PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(VkPhysicalDevice physDev, VkSurfaceKHR surfaceToPresent, u32* gfxQueue, u32* presQueue, PNSLR_Allocator tempAllocator)
 {
     if (!gfxQueue || !presQueue) FORCE_DBG_TRAP;
 
@@ -247,7 +248,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     #endif
 
     u32 gfxQueueFamIdx = U32_MAX, presQueueFamIdx = U32_MAX;
-    PNSLR_ArraySlice(VkDeviceQueueCreateInfo) qcis = MZNT_Internal_SelectQueueFamilies(selectedDevice, tempSurfaceForQueueSelect, &gfxQueueFamIdx, &presQueueFamIdx, tempAllocator);
+    PNSLR_ArraySlice(VkDeviceQueueCreateInfo) qcis = MZNT_Internal_SelectVkQueueFamilies(selectedDevice, tempSurfaceForQueueSelect, &gfxQueueFamIdx, &presQueueFamIdx, tempAllocator);
 
     vkDestroySurfaceKHR(output->instance, tempSurfaceForQueueSelect, nil);
     #if PNSLR_WINDOWS
@@ -302,6 +303,46 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
     return true;
 }
 
+void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator)
+{
+    // get swapchain images
+    {
+        u32 swapchainImageCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(surface->renderer->device, surface->swapchain, &swapchainImageCount, nil));
+        surface->swapchainImages = PNSLR_MakeSlice(VkImage, swapchainImageCount, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(surface->renderer->device, surface->swapchain, &swapchainImageCount, surface->swapchainImages.data));
+        surface->swapchainImages.count = (i64) swapchainImageCount;
+    }
+
+    {
+        surface->swapchainImageViews = PNSLR_MakeSlice(VkImageView, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        for (i64 i = 0; i < surface->swapchainImages.count; i++)
+        {
+            VkImageViewCreateInfo ivCreateInfo = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = surface->swapchainImages.data[i],
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = VK_FORMAT_B8G8R8A8_UNORM,
+                .components = {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            };
+
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(surface->renderer->device, &ivCreateInfo, nil, &(surface->swapchainImageViews.data[i])));
+        }
+    }
+}
+
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return nil;
@@ -337,18 +378,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRendere
         formats.count = (i64) fmtCount;
     }
 
-    VkSurfaceFormatKHR selectedFormat = formats.data[0];
-    for (i64 i = 0; i < formats.count; i++)
-    {
-        if (formats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM && formats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-        {
-            selectedFormat = formats.data[i];
-            break;
-        }
-    }
-
-    VkPresentModeKHR chosenPresentMode = VK_PRESENT_MODE_FIFO_KHR; // guaranteed to be available
-
     u32 imageCount = surfaceCaps.minImageCount + 1;
     if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
         imageCount = surfaceCaps.maxImageCount;
@@ -357,56 +386,21 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRendere
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = output->surface,
         .minImageCount = imageCount,
-        .imageFormat = selectedFormat.format,
-        .imageColorSpace = selectedFormat.colorSpace,
+        .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
+        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         .imageExtent = surfaceCaps.currentExtent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .preTransform = surfaceCaps.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = chosenPresentMode,
+        .presentMode = VK_PRESENT_MODE_FIFO_KHR, // always available
         .clipped = VK_TRUE,
     };
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(renderer->device, &swapchainCI, nil, &(output->swapchain)));
 
-    // get swapchain images
-    {
-        u32 swapchainImageCount = 0;
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(renderer->device, output->swapchain, &swapchainImageCount, nil));
-        output->swapchainImages = PNSLR_MakeSlice(VkImage, swapchainImageCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(renderer->device, output->swapchain, &swapchainImageCount, output->swapchainImages.data));
-        output->swapchainImages.count = (i64) swapchainImageCount;
-    }
-
-    {
-        output->swapchainImageViews = PNSLR_MakeSlice(VkImageView, output->swapchainImages.count, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-        for (i64 i = 0; i < output->swapchainImages.count; i++)
-        {
-            VkImageViewCreateInfo ivCreateInfo = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .image = output->swapchainImages.data[i],
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = selectedFormat.format,
-                .components = {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
-
-            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(renderer->device, &ivCreateInfo, nil, &output->swapchainImageViews.data[i]));
-        }
-    }
+    MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
     return output;
 }
@@ -433,4 +427,48 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     return true;
 }
 
+b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator)
+{
+    if (!surface) return false;
+    if (!surface->renderer) FORCE_DBG_TRAP;
+
+    vkDeviceWaitIdle(surface->renderer->device);
+
+    for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
+        vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
+
+    PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    VkSurfaceCapabilitiesKHR surfaceCaps;
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(surface->renderer->physicalDevice, surface->surface, &surfaceCaps));
+
+    u32 imageCount = surfaceCaps.minImageCount + 1;
+    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
+        imageCount = surfaceCaps.maxImageCount;
+
+    // ignore input width/height, use current extent from surface capabilities
+    VkSwapchainCreateInfoKHR swapchainCI = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = surface->surface,
+        .minImageCount = imageCount,
+        .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
+        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+        .imageExtent = surfaceCaps.currentExtent,
+        .imageArrayLayers = 1,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .preTransform = surfaceCaps.currentTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+        .clipped = VK_TRUE,
+        .oldSwapchain = surface->swapchain,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(surface->renderer->device, &swapchainCI, nil, &(surface->swapchain)));
+    vkDestroySwapchainKHR(surface->renderer->device, swapchainCI.oldSwapchain, nil);
+
+    MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
+    return true;
+}
 #endif

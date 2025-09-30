@@ -87,5 +87,10 @@ MZNT_RendererSurface* MZNT_CreateRendererSurface(MZNT_Renderer* renderer, MZNT_W
  */
 b8 MZNT_DestroyRendererSurface(MZNT_RendererSurface* surface, PNSLR_Allocator tempAllocator);
 
+/**
+ * Handles resizing the given rendering surface to the specified dimensions.
+ */
+b8 MZNT_ResizeRendererSurface(MZNT_RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
+
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================

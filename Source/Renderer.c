@@ -192,6 +192,15 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+MZNT_RHI_FN_FOUR_ARG(
+    b8, STAT,
+    ResizeRendererSurface, (surface ? surface->type : 0),
+    RendererSurface, surface, DYNA,
+    u16, width, STAT,
+    u16, height, STAT,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
 // macro bs ===================================================================================================================
 
 #undef MZNT_RHI_FN_SIX_ARG
