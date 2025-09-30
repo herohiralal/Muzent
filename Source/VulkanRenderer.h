@@ -15,8 +15,13 @@ typedef struct MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
     VkInstance       instance;
+    #if PNSLR_DBG
+        VkDebugUtilsMessengerEXT debugMessenger;
+    #endif
     VkPhysicalDevice physicalDevice;
     VkDevice         device;
+    u32              gfxQueueFamilyIndex;
+    u32              presQueueFamilyIndex;
     VkQueue          gfxQueue;
     VkQueue          presQueue;
 } MZNT_VulkanRenderer;
@@ -32,6 +37,8 @@ typedef struct MZNT_VulkanRendererSurface
     VkSwapchainKHR                swapchain;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+    VkCommandPool                 cmdPool;
+    VkCommandBuffer               cmdBuffer;
 } MZNT_VulkanRendererSurface;
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);

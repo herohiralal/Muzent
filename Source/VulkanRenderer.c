@@ -3,6 +3,36 @@
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
+VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT types,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+    PNSLR_LoggerLevel lvl = (PNSLR_LoggerLevel) {0};
+    if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)        lvl = PNSLR_LoggerLevel_Error;
+    else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) lvl = PNSLR_LoggerLevel_Warn;
+    else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)    lvl = PNSLR_LoggerLevel_Info;
+    else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) lvl = PNSLR_LoggerLevel_Debug;
+    else                                                                 lvl = PNSLR_LoggerLevel_Debug;
+
+    utf8str general = (types & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) ? PNSLR_StringLiteral("[GENERAL]") : PNSLR_StringLiteral("");
+    utf8str validation = (types & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) ? PNSLR_StringLiteral("[VALIDATION]") : PNSLR_StringLiteral("");
+    utf8str performance = (types & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) ? PNSLR_StringLiteral("[PERFORMANCE]") : PNSLR_StringLiteral("");
+
+    PNSLR_Logf(lvl, PNSLR_StringLiteral("VK DEBUG UTILS: $. $ $ $"),
+        PNSLR_FmtArgs(
+            PNSLR_FmtCString((cstring) pCallbackData->pMessage),
+            PNSLR_FmtString(general),
+            PNSLR_FmtString(validation),
+            PNSLR_FmtString(performance),
+        ),
+        PNSLR_GET_LOC()
+    );
+
+    return VK_FALSE;
+}
+
 static inline void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
 {
     utf8str message = {0};
@@ -208,6 +238,25 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     volkLoadInstanceOnly(output->instance);
 
+    #if PNSLR_DBG
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+            .pNext = nil,
+            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .pfnUserCallback = MZNT_Internal_VkDebugCallback,
+            .pUserData       = output,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDebugUtilsMessengerEXT(output->instance, &debugCreateInfo, nil, &output->debugMessenger));
+    #endif
+
     u32 deviceCount = 0;
     vkEnumeratePhysicalDevices(output->instance, &deviceCount, nil);
     PNSLR_ArraySlice(VkPhysicalDevice) devices = PNSLR_MakeSlice(VkPhysicalDevice, deviceCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
@@ -247,8 +296,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         #error "unimplemented"
     #endif
 
-    u32 gfxQueueFamIdx = U32_MAX, presQueueFamIdx = U32_MAX;
-    PNSLR_ArraySlice(VkDeviceQueueCreateInfo) qcis = MZNT_Internal_SelectVkQueueFamilies(selectedDevice, tempSurfaceForQueueSelect, &gfxQueueFamIdx, &presQueueFamIdx, tempAllocator);
+    PNSLR_ArraySlice(VkDeviceQueueCreateInfo) qcis = MZNT_Internal_SelectVkQueueFamilies(selectedDevice, tempSurfaceForQueueSelect, &(output->gfxQueueFamilyIndex), &(output->presQueueFamilyIndex), tempAllocator);
 
     vkDestroySurfaceKHR(output->instance, tempSurfaceForQueueSelect, nil);
     #if PNSLR_WINDOWS
@@ -279,8 +327,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     volkLoadDevice(output->device);
 
-    VkDeviceQueueInfo2 gfxQueueInfo  = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = gfxQueueFamIdx,  .queueIndex = 0};
-    VkDeviceQueueInfo2 presQueueInfo = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = presQueueFamIdx, .queueIndex = 0};
+    VkDeviceQueueInfo2 gfxQueueInfo  = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = output->gfxQueueFamilyIndex,  .queueIndex = 0};
+    VkDeviceQueueInfo2 presQueueInfo = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = output->presQueueFamilyIndex, .queueIndex = 0};
 
     vkGetDeviceQueue2(output->device, &gfxQueueInfo,  &output->gfxQueue);
     vkGetDeviceQueue2(output->device, &presQueueInfo, &output->presQueue);
@@ -293,6 +341,10 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
     if (!renderer) return false;
 
     vkDestroyDevice(renderer->device, nil);
+
+    #if PNSLR_DBG
+        vkDestroyDebugUtilsMessengerEXT(renderer->instance, renderer->debugMessenger, nil);
+    #endif
 
     vkDestroyInstance(renderer->instance, nil);
 
@@ -402,6 +454,23 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRendere
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
+    VkCommandPoolCreateInfo cmdPoolCI = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolCI, nil, &(output->cmdPool)));
+
+    VkCommandBufferAllocateInfo cmdBufAI = {
+        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool        = output->cmdPool,
+        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->cmdBuffer)));
+
     return output;
 }
 
@@ -409,6 +478,11 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 {
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+
+    vkFreeCommandBuffers(surface->renderer->device, surface->cmdPool, 1, &(surface->cmdBuffer));
+    vkDestroyCommandPool(surface->renderer->device, surface->cmdPool, nil);
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
@@ -432,7 +506,7 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
-    vkDeviceWaitIdle(surface->renderer->device);
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
