@@ -177,6 +177,21 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+MZNT_RHI_FN_THREE_ARG(
+    MZNT_RendererSurface*, DYNA,
+    CreateRendererSurface, (renderer ? renderer->type : 0),
+    Renderer, renderer, DYNA,
+    MZNT_WindowHandle, windowHandle, STAT,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
+MZNT_RHI_FN_TWO_ARG(
+    b8, STAT,
+    DestroyRendererSurface, (surface ? surface->type : 0),
+    RendererSurface, surface, DYNA,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
 // macro bs ===================================================================================================================
 
 #undef MZNT_RHI_FN_SIX_ARG

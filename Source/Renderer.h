@@ -14,11 +14,36 @@ ENUM_START(MZNT_RendererType, u8)
 ENUM_END
 
 /**
+ * Represents an opaque handle to the application instance.
+ * Matches Dvaarpaal's app handle.
+ * - On Windows, this is an HINSTANCE.
+ * - On OSX, this is an NSApplication*.
+ * - On Android, this is a struct android_app*.
+ */
+typedef struct MZNT_AppHandle
+{
+    u64 handle;
+} MZNT_AppHandle;
+
+/**
+ * Represents an opaque handle to a window.
+ * Matches Dvaarpaal's window handle.
+ * - On Windows, this is an HWND.
+ * - On OSX, this is an NSWindow*.
+ * - On Android, this is an ANativeWindow*.
+ */
+typedef struct MZNT_WindowHandle
+{
+    u64 handle;
+} MZNT_WindowHandle;
+
+/**
  * Configuration structure for renderer creation.
  */
 typedef struct MZNT_RendererConfiguration
 {
     MZNT_RendererType type;
+    MZNT_AppHandle    appHandle;
     PNSLR_Allocator   allocator;
     utf8str           appName;
 } MZNT_RendererConfiguration;
@@ -31,6 +56,7 @@ typedef struct MZNT_Renderer
 {
     MZNT_RendererType type;
     PNSLR_Allocator   allocator;
+    MZNT_AppHandle    appHandle;
 } MZNT_Renderer;
 
 /**
@@ -42,6 +68,24 @@ MZNT_Renderer* MZNT_CreateRenderer(MZNT_RendererConfiguration config, PNSLR_Allo
  * Destroys the given renderer instance and frees associated resources.
  */
 b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
+
+/**
+ * A surface that can be drawn on top of.
+ */
+typedef struct MZNT_RendererSurface
+{
+    MZNT_RendererType type;
+} MZNT_RendererSurface;
+
+/**
+ * Creates a rendering surface for the given window and application handles.
+ */
+MZNT_RendererSurface* MZNT_CreateRendererSurface(MZNT_Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
+
+/**
+ * Destroys the given rendering surface and frees associated resources.
+ */
+b8 MZNT_DestroyRendererSurface(MZNT_RendererSurface* surface, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================

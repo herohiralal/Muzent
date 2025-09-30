@@ -4,17 +4,38 @@
 #include "Renderer.h"
 EXTERN_C_BEGIN
 
+PNSLR_DECLARE_ARRAY_SLICE(VkPhysicalDevice);
+PNSLR_DECLARE_ARRAY_SLICE(VkQueueFamilyProperties);
+PNSLR_DECLARE_ARRAY_SLICE(VkDeviceQueueCreateInfo);
+PNSLR_DECLARE_ARRAY_SLICE(VkSurfaceFormatKHR);
+PNSLR_DECLARE_ARRAY_SLICE(VkImage);
+PNSLR_DECLARE_ARRAY_SLICE(VkImageView);
+
 typedef struct MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
     VkInstance       instance;
+    VkPhysicalDevice physicalDevice;
     VkDevice         device;
     VkQueue          gfxQueue;
-    VkQueue          computeQueue;
+    VkQueue          presQueue;
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
 b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);
+
+typedef struct MZNT_VulkanRendererSurface
+{
+    MZNT_RendererSurface          parent;
+    MZNT_VulkanRenderer*          renderer;
+    VkSurfaceKHR                  surface;
+    VkSwapchainKHR                swapchain;
+    PNSLR_ArraySlice(VkImage)     swapchainImages;
+    PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+} MZNT_VulkanRendererSurface;
+
+MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
+b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif
