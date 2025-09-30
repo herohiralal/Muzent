@@ -8,11 +8,13 @@ typedef struct MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
     VkInstance       instance;
-    VkPhysicalDevice physicalDevice;
+    VkDevice         device;
+    VkQueue          gfxQueue;
+    VkQueue          computeQueue;
 } MZNT_VulkanRenderer;
 
-MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config);
-b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer);
+MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
+b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif

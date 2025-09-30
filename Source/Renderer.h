@@ -20,6 +20,7 @@ typedef struct MZNT_RendererConfiguration
 {
     MZNT_RendererType type;
     PNSLR_Allocator   allocator;
+    utf8str           appName;
 } MZNT_RendererConfiguration;
 
 /**
@@ -35,12 +36,12 @@ typedef struct MZNT_Renderer
 /**
  * Creates a renderer instance based on the provided configuration.
  */
-MZNT_Renderer* MZNT_CreateRenderer(MZNT_RendererConfiguration config);
+MZNT_Renderer* MZNT_CreateRenderer(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
 
 /**
  * Destroys the given renderer instance and frees associated resources.
  */
-b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer);
+b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================
