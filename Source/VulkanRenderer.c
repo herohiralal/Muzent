@@ -139,6 +139,8 @@ PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectQueueFamilies(VkPh
             .pQueuePriorities = &queuePriority,
         };
     }
+
+    return queueCreateInfos;
 }
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
@@ -265,7 +267,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkDeviceCreateInfo deviceCreateInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .queueCreateInfoCount = qcis.count,
+        .queueCreateInfoCount = (u32) qcis.count,
         .pQueueCreateInfos = qcis.data,
         .enabledExtensionCount = enabledDeviceExtensionCount,
         .ppEnabledExtensionNames = enabledDeviceExtensions,
@@ -330,7 +332,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurface_Vulkan(MZNT_VulkanRendere
     {
         u32 fmtCount = 0;
         MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(renderer->physicalDevice, output->surface, &fmtCount, nil));
-        PNSLR_ArraySlice(VkSurfaceFormatKHR) formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+        formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
         MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(renderer->physicalDevice, output->surface, &fmtCount, formats.data));
         formats.count = (i64) fmtCount;
     }
