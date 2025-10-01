@@ -80,7 +80,7 @@ typedef struct MZNT_RendererSurface
 /**
  * Creates a rendering surface for the given window and application handles.
  */
-MZNT_RendererSurface* MZNT_CreateRendererSurface(MZNT_Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
+MZNT_RendererSurface* MZNT_CreateRendererSurfaceFromWindow(MZNT_Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
 
 /**
  * Destroys the given rendering surface and frees associated resources.

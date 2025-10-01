@@ -179,7 +179,7 @@ MZNT_RHI_FN_TWO_ARG(
 
 MZNT_RHI_FN_THREE_ARG(
     MZNT_RendererSurface*, DYNA,
-    CreateRendererSurface, (renderer ? renderer->type : 0),
+    CreateRendererSurfaceFromWindow, (renderer ? renderer->type : 0),
     Renderer, renderer, DYNA,
     MZNT_WindowHandle, windowHandle, STAT,
     PNSLR_Allocator, tempAllocator, STAT
