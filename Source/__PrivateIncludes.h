@@ -39,7 +39,9 @@ PNSLR_SUPPRESS_WARN
     #ifndef __cplusplus
         #define VOLK_IMPLEMENTATION
     #endif
+    #define VOLK_VULKAN_H_PATH "../vulkan/vulkan.h"
     #include "Dependencies/volk/volk.h"
+    #undef VOLK_VULKAN_H_PATH
 #endif
 
 PNSLR_UNSUPPRESS_WARN
