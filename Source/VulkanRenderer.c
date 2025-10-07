@@ -331,9 +331,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
 
+    VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
+        .synchronization2 = VK_TRUE,
+    };
+
     VkDeviceCreateInfo deviceCreateInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &sync2Features,
         .queueCreateInfoCount = (u32) qcis.count,
         .pQueueCreateInfos = qcis.data,
         .enabledExtensionCount = enabledDeviceExtensionCount,
@@ -460,7 +466,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         .imageExtent = surfaceCaps.currentExtent,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .preTransform = surfaceCaps.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -574,7 +580,7 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
         .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
         .imageExtent = surfaceCaps.currentExtent,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .preTransform = surfaceCaps.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -623,12 +629,14 @@ void MZNT_Internal_TransitionVkImage(VkCommandBuffer cmd, VkImage image, VkImage
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
 {
+    static const u64 K_SecondToNanoSecond = 1000 * 1000 * 1000;
+
     i32 frameInFlightIdx = (surface->frameNumber % MZNT_NUM_FRAMES_IN_FLIGHT);
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkWaitForFences(surface->renderer->device, 1, &(surface->renderFence[frameInFlightIdx]), VK_TRUE, 1000000000));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkWaitForFences(surface->renderer->device, 1, &(surface->renderFence[frameInFlightIdx]), VK_TRUE, 20 * K_SecondToNanoSecond));
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetFences(surface->renderer->device, 1, &(surface->renderFence[frameInFlightIdx])));
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkAcquireNextImageKHR(surface->renderer->device, surface->swapchain, 1000000000, surface->swapchainSemaphore[frameInFlightIdx], VK_NULL_HANDLE, &(surface->curSwpchImgIdx)));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAcquireNextImageKHR(surface->renderer->device, surface->swapchain, 20 * K_SecondToNanoSecond, surface->swapchainSemaphore[frameInFlightIdx], VK_NULL_HANDLE, &(surface->curSwpchImgIdx)));
 
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[frameInFlightIdx]);
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandBuffer(cmdBuf->cmdBuffer, 0));
