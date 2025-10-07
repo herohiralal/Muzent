@@ -43,7 +43,7 @@ PNSLR_SUPPRESS_WARN
     #include "Dependencies/volk/volk.h"
     #undef VOLK_VULKAN_H_PATH
 
-    #ifndef __cplusplus
+    #ifdef __cplusplus // contains some includes that only work with c++
         #define VMA_IMPLEMENTATION
     #endif
     #include "Dependencies/VMA/vk_mem_alloc.h"
