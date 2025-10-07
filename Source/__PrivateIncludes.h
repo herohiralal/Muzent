@@ -42,6 +42,12 @@ PNSLR_SUPPRESS_WARN
     #define VOLK_VULKAN_H_PATH "../vulkan/vulkan.h"
     #include "Dependencies/volk/volk.h"
     #undef VOLK_VULKAN_H_PATH
+
+    #ifndef __cplusplus
+        #define VMA_IMPLEMENTATION
+    #endif
+    #include "Dependencies/VMA/vk_mem_alloc.h"
+    #undef VMA_IMPLEMENTATION
 #endif
 
 PNSLR_UNSUPPRESS_WARN
