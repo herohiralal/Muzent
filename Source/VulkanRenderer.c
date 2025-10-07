@@ -125,12 +125,20 @@ PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(Vk
         queueFamilies.count = (i64) queueFamilyCount;
     }
 
+    b8 foundComputeSupport = false;
     for (i64 i = 0; i < queueFamilies.count; i++)
     {
         VkQueueFlags flags = queueFamilies.data[i].queueFlags;
 
-        if ((flags & VK_QUEUE_GRAPHICS_BIT) && *gfxQueue == U32_MAX)
-            *gfxQueue = (u32) i;
+        if (flags & VK_QUEUE_GRAPHICS_BIT)
+        {
+            b8 currentQueueSupportsCompute = !!(flags & VK_QUEUE_COMPUTE_BIT);
+            if (*gfxQueue == U32_MAX || (!foundComputeSupport && currentQueueSupportsCompute))
+            {
+                *gfxQueue = (u32) i;
+                foundComputeSupport = currentQueueSupportsCompute;
+            }
+        }
 
         VkBool32 supportsPresent = VK_FALSE;
         vkGetPhysicalDeviceSurfaceSupportKHR(physDev, (u32) i, surfaceToPresent, &supportsPresent);
@@ -266,10 +274,20 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
     for (i64 i = 0; i < devices.count; i++)
     {
-        VkPhysicalDeviceProperties deviceProperties;
-        vkGetPhysicalDeviceProperties(devices.data[i], &deviceProperties);
+        VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+        VkPhysicalDeviceVulkan12Features deviceFeatures12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &deviceFeatures13};
+        VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, .pNext = &deviceFeatures12};
+        VkPhysicalDeviceFeatures2 deviceFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &deviceFeatures11};
+        vkGetPhysicalDeviceFeatures2(devices.data[i], &deviceFeatures);
 
-        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        VkPhysicalDeviceProperties2 deviceProperties = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+        vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
+
+        if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+            deviceFeatures12.bufferDeviceAddress &&
+            deviceFeatures12.descriptorIndexing &&
+            deviceFeatures13.dynamicRendering &&
+            deviceFeatures13.synchronization2)
         {
             selectedDevice = devices.data[i];
             break;
