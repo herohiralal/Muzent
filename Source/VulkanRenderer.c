@@ -357,12 +357,23 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     vkGetDeviceQueue2(output->device, &gfxQueueInfo,  &output->gfxQueue);
     vkGetDeviceQueue2(output->device, &presQueueInfo, &output->presQueue);
 
+    VmaAllocatorCreateInfo allocatorInfo = {
+        .physicalDevice = output->physicalDevice,
+        .device = output->device,
+        .instance = output->instance,
+        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+    };
+
+    vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
+
     return output;
 }
 
 b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return false;
+
+    vmaDestroyAllocator(renderer->vmaAllocator);
 
     vkDestroyDevice(renderer->device, nil);
 

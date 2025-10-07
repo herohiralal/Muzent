@@ -24,6 +24,8 @@ typedef struct MZNT_VulkanRenderer
     u32              presQueueFamilyIndex;
     VkQueue          gfxQueue;
     VkQueue          presQueue;
+
+    VmaAllocator     vmaAllocator;
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
