@@ -69,20 +69,22 @@ MZNT_Renderer* MZNT_CreateRenderer(MZNT_RendererConfiguration config, PNSLR_Allo
  */
 b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
 
+//+skipreflect
+
+/**
+ * The number of frames that can be processed concurrently.
+ */
+#define MZNT_NUM_FRAMES_IN_FLIGHT 3
+
+//-skipreflect
+
+/**
+ * A command buffer for recording rendering commands.
+ */
 typedef struct MZNT_RendererCommandBuffer
 {
     MZNT_RendererType type;
 } MZNT_RendererCommandBuffer;
-
-/**
- * Creates a command buffer for the given renderer.
- */
-MZNT_RendererCommandBuffer* MZNT_CreateRendererCommandBuffer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
-
-/**
- * Destroys the given command buffer and frees associated resources.
- */
-b8 MZNT_DestroyRendererCommandBuffer(MZNT_RendererCommandBuffer* commandBuffer, PNSLR_Allocator tempAllocator);
 
 /**
  * A surface that can be drawn on top of.
@@ -94,6 +96,7 @@ typedef struct MZNT_RendererSurface
 
 /**
  * Creates a rendering surface for the given window and application handles.
+ * Uses 3 frames in flight.
  */
 MZNT_RendererSurface* MZNT_CreateRendererSurfaceFromWindow(MZNT_Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
 
@@ -106,6 +109,17 @@ b8 MZNT_DestroyRendererSurface(MZNT_RendererSurface* surface, PNSLR_Allocator te
  * Handles resizing the given rendering surface to the specified dimensions.
  */
 b8 MZNT_ResizeRendererSurface(MZNT_RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
+
+/**
+ * Begins a new frame for the given rendering surface, returning a command buffer for recording commands.
+ * The returned command buffer must be ended with MZNT_EndFrame (to submit drawing for the current frame).
+ */
+MZNT_RendererCommandBuffer* MZNT_BeginFrame(MZNT_RendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
+
+/**
+ * Ends the current frame for the given rendering surface, submitting recorded commands for execution.
+ */
+b8 MZNT_EndFrame(MZNT_RendererSurface* surface, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================

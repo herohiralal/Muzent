@@ -413,60 +413,6 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
     }
 }
 
-MZNT_VulkanRendererCommandBuffer* MZNT_CreateRendererCommandBuffer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator)
-{
-    if (!renderer) return nil;
-
-    MZNT_VulkanRendererCommandBuffer* output = PNSLR_New(MZNT_VulkanRendererCommandBuffer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-    if (!output) FORCE_DBG_TRAP;
-
-    output->parent.type = MZNT_RendererType_Vulkan;
-    output->renderer    = renderer;
-
-    VkCommandPoolCreateInfo cmdPoolCI = {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolCI, nil, &(output->cmdPool)));
-
-    VkCommandBufferAllocateInfo cmdBufAI = {
-        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = output->cmdPool,
-        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->cmdBuffer)));
-
-    VkFenceCreateInfo fenceCI = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->completeFence)));
-
-    return output;
-}
-
-b8 MZNT_DestroyRendererCommandBuffer_Vulkan(MZNT_VulkanRendererCommandBuffer* commandBuffer, PNSLR_Allocator tempAllocator)
-{
-    if (!commandBuffer) return false;
-    if (!commandBuffer->renderer) FORCE_DBG_TRAP;
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(commandBuffer->renderer->device));
-
-    vkDestroyFence(commandBuffer->renderer->device, commandBuffer->completeFence, nil);
-
-    vkFreeCommandBuffers(commandBuffer->renderer->device, commandBuffer->cmdPool, 1, &(commandBuffer->cmdBuffer));
-    vkDestroyCommandPool(commandBuffer->renderer->device, commandBuffer->cmdPool, nil);
-
-    PNSLR_Delete(commandBuffer, commandBuffer->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-
-    return true;
-}
-
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return nil;
@@ -526,6 +472,43 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
+    output->frameNumber = 0;
+    output->curSwpchImgIdx = 0;
+
+    VkCommandPoolCreateInfo cmdPoolInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
+    };
+
+    for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolInfo, nil, &(output->commandBuffers[i].cmdPool)));
+
+        VkCommandBufferAllocateInfo cmdBufAI = {
+            .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool        = output->commandBuffers[i].cmdPool,
+            .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->commandBuffers[i].cmdBuffer)));
+
+        output->commandBuffers[i].renderer = renderer;
+        output->commandBuffers[i].parent.type = MZNT_RendererType_Vulkan;
+
+        VkFenceCreateInfo fenceCI = {
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+            .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->renderFence[i])));
+
+        VkSemaphoreCreateInfo semaphoreCI = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSemaphore(renderer->device, &semaphoreCI, nil, &(output->swapchainSemaphore[i])));
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSemaphore(renderer->device, &semaphoreCI, nil, &(output->renderSemaphore[i])));
+    }
+
     return output;
 }
 
@@ -533,6 +516,17 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 {
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+
+    for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroySemaphore(surface->renderer->device, surface->renderSemaphore[i], nil);
+        vkDestroySemaphore(surface->renderer->device, surface->swapchainSemaphore[i], nil);
+        vkDestroyFence(surface->renderer->device, surface->renderFence[i], nil);
+        vkFreeCommandBuffers(surface->renderer->device, surface->commandBuffers[i].cmdPool, 1, &(surface->commandBuffers[i].cmdBuffer));
+        vkDestroyCommandPool(surface->renderer->device, surface->commandBuffers[i].cmdPool, nil);
+    }
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
@@ -556,7 +550,7 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueWaitIdle(surface->renderer->gfxQueue));
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
@@ -594,6 +588,130 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
     return true;
+}
+
+void MZNT_Internal_TransitionVkImage(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout, VkImageLayout newLayout)
+{
+    VkImageMemoryBarrier2 imageBarrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .pNext = nil,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .oldLayout = currentLayout,
+        .newLayout = newLayout,
+        .subresourceRange = {
+            .aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount = VK_REMAINING_ARRAY_LAYERS,
+        },
+        .image = image,
+    };
+
+    VkDependencyInfo depInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext = nil,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &imageBarrier,
+    };
+
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+}
+
+MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
+{
+    i32 frameInFlightIdx = (surface->frameNumber % MZNT_NUM_FRAMES_IN_FLIGHT);
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkWaitForFences(surface->renderer->device, 1, &(surface->renderFence[frameInFlightIdx]), VK_TRUE, 1000000000));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkResetFences(surface->renderer->device, 1, &(surface->renderFence[frameInFlightIdx])));
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAcquireNextImageKHR(surface->renderer->device, surface->swapchain, 1000000000, surface->swapchainSemaphore[frameInFlightIdx], VK_NULL_HANDLE, &(surface->curSwpchImgIdx)));
+
+    MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[frameInFlightIdx]);
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandBuffer(cmdBuf->cmdBuffer, 0));
+
+    VkCommandBufferBeginInfo cmdBufBI = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkBeginCommandBuffer(cmdBuf->cmdBuffer, &cmdBufBI));
+
+    MZNT_Internal_TransitionVkImage(cmdBuf->cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    // clear frame buffer
+    VkClearColorValue clearColour = {.float32 = {r, g, b, a}};
+    VkImageSubresourceRange clearRange = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = VK_REMAINING_MIP_LEVELS,
+        .baseArrayLayer = 0,
+        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    };
+    vkCmdClearColorImage(cmdBuf->cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_GENERAL, &clearColour, 1, &clearRange);
+
+    return cmdBuf;
+}
+
+b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator)
+{
+    i32 frameInFlightIdx = (surface->frameNumber % MZNT_NUM_FRAMES_IN_FLIGHT);
+
+    MZNT_Internal_TransitionVkImage(surface->commandBuffers[frameInFlightIdx].cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(surface->commandBuffers[frameInFlightIdx].cmdBuffer));
+
+    VkCommandBufferSubmitInfo cmdSubmitInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = surface->commandBuffers[frameInFlightIdx].cmdBuffer,
+    };
+
+    VkSemaphoreSubmitInfo waitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = surface->swapchainSemaphore[frameInFlightIdx],
+        .value = 1,
+        .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+    };
+
+    VkSemaphoreSubmitInfo signalInfo = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = surface->renderSemaphore[frameInFlightIdx],
+        .value = 1,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+    };
+
+    VkSubmitInfo2 submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nil,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = &waitInfo,
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos = &cmdSubmitInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = &signalInfo,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit2(surface->renderer->gfxQueue, 1, &submitInfo, surface->renderFence[frameInFlightIdx]));
+
+    VkPresentInfoKHR presentInfo = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nil,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &(surface->renderSemaphore[frameInFlightIdx]),
+        .swapchainCount = 1,
+        .pSwapchains = &(surface->swapchain),
+        .pImageIndices = &(surface->curSwpchImgIdx),
+        .pResults = nil,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueuePresentKHR(surface->renderer->gfxQueue, &presentInfo));
+
+    surface->frameNumber++;
+    surface->curSwpchImgIdx = U32_MAX; // invalidate
 }
 
 #endif

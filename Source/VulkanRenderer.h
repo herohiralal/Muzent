@@ -35,11 +35,7 @@ typedef struct MZNT_VulkanRendererCommandBuffer
     MZNT_VulkanRenderer*       renderer;
     VkCommandPool              cmdPool;
     VkCommandBuffer            cmdBuffer;
-    VkFence                    completeFence;
 } MZNT_VulkanRendererCommandBuffer;
-
-MZNT_VulkanRendererCommandBuffer* MZNT_CreateRendererCommandBuffer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);
-b8 MZNT_DestroyRendererCommandBuffer_Vulkan(MZNT_VulkanRendererCommandBuffer* commandBuffer, PNSLR_Allocator tempAllocator);
 
 typedef struct MZNT_VulkanRendererSurface
 {
@@ -49,11 +45,21 @@ typedef struct MZNT_VulkanRendererSurface
     VkSwapchainKHR                swapchain;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+
+    u32                              frameNumber;
+    u32                              curSwpchImgIdx;
+    MZNT_VulkanRendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
+    VkSemaphore                      swapchainSemaphore[MZNT_NUM_FRAMES_IN_FLIGHT];
+    VkSemaphore                      renderSemaphore[MZNT_NUM_FRAMES_IN_FLIGHT];
+    VkFence                          renderFence[MZNT_NUM_FRAMES_IN_FLIGHT];
 } MZNT_VulkanRendererSurface;
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
 b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
 b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
+
+MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
+b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif

@@ -177,20 +177,6 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
-MZNT_RHI_FN_TWO_ARG(
-    MZNT_RendererCommandBuffer*, DYNA,
-    CreateRendererCommandBuffer, (renderer ? renderer->type : 0),
-    Renderer, renderer, DYNA,
-    PNSLR_Allocator, tempAllocator, STAT
-)
-
-MZNT_RHI_FN_TWO_ARG(
-    b8, STAT,
-    DestroyRendererCommandBuffer, (commandBuffer ? commandBuffer->type : 0),
-    RendererCommandBuffer, commandBuffer, DYNA,
-    PNSLR_Allocator, tempAllocator, STAT
-)
-
 MZNT_RHI_FN_THREE_ARG(
     MZNT_RendererSurface*, DYNA,
     CreateRendererSurfaceFromWindow, (renderer ? renderer->type : 0),
@@ -213,6 +199,23 @@ MZNT_RHI_FN_FOUR_ARG(
     u16, width, STAT,
     u16, height, STAT,
     PNSLR_Allocator, tempAllocator, STAT
+)
+
+MZNT_RHI_FN_SIX_ARG(
+    MZNT_RendererCommandBuffer*, DYNA,
+    BeginFrame, (surface ? surface->type : 0),
+    RendererSurface, surface, DYNA,
+    f32, r, STAT,
+    f32, g, STAT,
+    f32, b, STAT,
+    f32, a, STAT,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
+MZNT_RHI_FN_ONE_ARG(
+    b8, STAT,
+    DestroyCommandBuffer, (cmdBuffer ? cmdBuffer->type : 0),
+    RendererCommandBuffer, cmdBuffer, DYNA
 )
 
 // macro bs ===================================================================================================================
