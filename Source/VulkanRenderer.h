@@ -11,6 +11,8 @@ PNSLR_DECLARE_ARRAY_SLICE(VkSurfaceFormatKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkImage);
 PNSLR_DECLARE_ARRAY_SLICE(VkImageView);
 PNSLR_DECLARE_ARRAY_SLICE(VkPresentModeKHR);
+PNSLR_DECLARE_ARRAY_SLICE(VkFence);
+PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
 
 typedef struct MZNT_VulkanRenderer
 {
@@ -36,7 +38,6 @@ typedef struct MZNT_VulkanRendererCommandBuffer
 {
     MZNT_RendererCommandBuffer parent;
     MZNT_VulkanRenderer*       renderer;
-    VkCommandPool              cmdPool;
     VkCommandBuffer            cmdBuffer;
 } MZNT_VulkanRendererCommandBuffer;
 
@@ -48,13 +49,15 @@ typedef struct MZNT_VulkanRendererSurface
     VkSwapchainKHR                swapchain;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+    VkCommandPool                 cmdPool;
 
-    u32                              frameNumber;
+    u32                              curFrame;
+    u32                              semIdx;
     u32                              curSwpchImgIdx;
     MZNT_VulkanRendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
-    VkSemaphore                      swapchainSemaphore[MZNT_NUM_FRAMES_IN_FLIGHT];
-    VkSemaphore                      renderSemaphore[MZNT_NUM_FRAMES_IN_FLIGHT];
-    VkFence                          renderFence[MZNT_NUM_FRAMES_IN_FLIGHT];
+    PNSLR_ArraySlice(VkSemaphore)    presentCompleteSemaphores;
+    PNSLR_ArraySlice(VkSemaphore)    renderFinishedSemaphores;
+    PNSLR_ArraySlice(VkFence)        inFlightFences;
 } MZNT_VulkanRendererSurface;
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
