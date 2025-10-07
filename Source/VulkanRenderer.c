@@ -357,11 +357,17 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     vkGetDeviceQueue2(output->device, &gfxQueueInfo,  &output->gfxQueue);
     vkGetDeviceQueue2(output->device, &presQueueInfo, &output->presQueue);
 
+    VmaVulkanFunctions vmaFns = {
+        .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+        .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+    };
+
     VmaAllocatorCreateInfo allocatorInfo = {
         .physicalDevice = output->physicalDevice,
         .device = output->device,
         .instance = output->instance,
         .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+        .pVulkanFunctions = &vmaFns,
     };
 
     vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
@@ -490,7 +496,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
     output->frameNumber = 0;
-    output->curSwpchImgIdx = 0;
+    output->curSwpchImgIdx = U32_MAX;
 
     VkCommandPoolCreateInfo cmdPoolInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
