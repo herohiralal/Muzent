@@ -212,10 +212,11 @@ MZNT_RHI_FN_SIX_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
-MZNT_RHI_FN_ONE_ARG(
+MZNT_RHI_FN_TWO_ARG(
     b8, STAT,
-    DestroyCommandBuffer, (cmdBuffer ? cmdBuffer->type : 0),
-    RendererCommandBuffer, cmdBuffer, DYNA
+    EndFrame, (surface ? surface->type : 0),
+    RendererSurface, surface, DYNA,
+    PNSLR_Allocator, tempAllocator, STAT
 )
 
 // macro bs ===================================================================================================================

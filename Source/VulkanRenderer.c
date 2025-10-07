@@ -712,6 +712,7 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
 
     surface->frameNumber++;
     surface->curSwpchImgIdx = U32_MAX; // invalidate
+    return true;
 }
 
 #endif
