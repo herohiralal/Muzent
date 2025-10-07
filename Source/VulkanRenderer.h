@@ -35,6 +35,7 @@ typedef struct MZNT_VulkanRendererCommandBuffer
     MZNT_VulkanRenderer*       renderer;
     VkCommandPool              cmdPool;
     VkCommandBuffer            cmdBuffer;
+    VkFence                    completeFence;
 } MZNT_VulkanRendererCommandBuffer;
 
 MZNT_VulkanRendererCommandBuffer* MZNT_CreateRendererCommandBuffer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);

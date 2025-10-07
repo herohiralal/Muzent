@@ -440,6 +440,13 @@ MZNT_VulkanRendererCommandBuffer* MZNT_CreateRendererCommandBuffer_Vulkan(MZNT_V
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, &(output->cmdBuffer)));
 
+    VkFenceCreateInfo fenceCI = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->completeFence)));
+
     return output;
 }
 
@@ -449,6 +456,8 @@ b8 MZNT_DestroyRendererCommandBuffer_Vulkan(MZNT_VulkanRendererCommandBuffer* co
     if (!commandBuffer->renderer) FORCE_DBG_TRAP;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(commandBuffer->renderer->device));
+
+    vkDestroyFence(commandBuffer->renderer->device, commandBuffer->completeFence, nil);
 
     vkFreeCommandBuffers(commandBuffer->renderer->device, commandBuffer->cmdPool, 1, &(commandBuffer->cmdBuffer));
     vkDestroyCommandPool(commandBuffer->renderer->device, commandBuffer->cmdPool, nil);
