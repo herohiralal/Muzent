@@ -396,6 +396,79 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
     return true;
 }
 
+void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator)
+{
+    VkSurfaceCapabilitiesKHR surfaceCaps;
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(surface->renderer->physicalDevice, surface->surface, &surfaceCaps));
+
+    PNSLR_ArraySlice(VkSurfaceFormatKHR) formats;
+    {
+        u32 fmtCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(surface->renderer->physicalDevice, surface->surface, &fmtCount, nil));
+        formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(surface->renderer->physicalDevice, surface->surface, &fmtCount, formats.data));
+        formats.count = (i64) fmtCount;
+    }
+
+    u32 imageCount = surfaceCaps.minImageCount + 1;
+    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
+        imageCount = surfaceCaps.maxImageCount;
+
+    u32 presentModesCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(surface->renderer->physicalDevice, surface->surface, &presentModesCount, nil);
+    PNSLR_ArraySlice(VkPresentModeKHR) presentModes = PNSLR_MakeSlice(VkPresentModeKHR, presentModesCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(surface->renderer->physicalDevice, surface->surface, &presentModesCount, presentModes.data);
+
+    VkPresentModeKHR selectedPresentMode = VK_PRESENT_MODE_FIFO_KHR; // always available
+    for (i64 i = 0; i < presentModes.count; i++)
+    {
+        if (presentModes.data[i] == VK_PRESENT_MODE_MAILBOX_KHR) // best quality
+        {
+            selectedPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+        }
+    }
+
+    VkSwapchainCreateInfoKHR swapchainCI = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface = surface->surface,
+        .minImageCount = imageCount,
+        .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
+        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+        .imageExtent = surfaceCaps.currentExtent,
+        .imageArrayLayers = 1,
+        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .preTransform = surfaceCaps.currentTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = selectedPresentMode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = surface->swapchain,
+    };
+
+    u32 queueFamilyIndices[] = {surface->renderer->gfxQueueFamilyIndex, surface->renderer->presQueueFamilyIndex};
+    if (surface->renderer->gfxQueueFamilyIndex != surface->renderer->presQueueFamilyIndex)
+    {
+        swapchainCI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapchainCI.queueFamilyIndexCount = 2;
+        swapchainCI.pQueueFamilyIndices = queueFamilyIndices;
+    }
+    else
+    {
+        swapchainCI.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchainCI.queueFamilyIndexCount = 0;
+        swapchainCI.pQueueFamilyIndices = nil;
+    }
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(surface->renderer->device, &swapchainCI, nil, &(surface->swapchain)));
+
+    if (swapchainCI.oldSwapchain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(surface->renderer->device, swapchainCI.oldSwapchain, nil);
+    }
+
+    surface->curSwpchImgIdx = U32_MAX;
+}
+
 void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator)
 {
     // get swapchain images
@@ -459,39 +532,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         #error "unimplemented"
     #endif
 
-    VkSurfaceCapabilitiesKHR surfaceCaps;
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(renderer->physicalDevice, output->surface, &surfaceCaps));
-
-    PNSLR_ArraySlice(VkSurfaceFormatKHR) formats;
-    {
-        u32 fmtCount = 0;
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(renderer->physicalDevice, output->surface, &fmtCount, nil));
-        formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(renderer->physicalDevice, output->surface, &fmtCount, formats.data));
-        formats.count = (i64) fmtCount;
-    }
-
-    u32 imageCount = surfaceCaps.minImageCount + 1;
-    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
-        imageCount = surfaceCaps.maxImageCount;
-
-    VkSwapchainCreateInfoKHR swapchainCI = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = output->surface,
-        .minImageCount = imageCount,
-        .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
-        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent = surfaceCaps.currentExtent,
-        .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .preTransform = surfaceCaps.currentTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR, // always available
-        .clipped = VK_TRUE,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(renderer->device, &swapchainCI, nil, &(output->swapchain)));
+    MZNT_Internal_CreateVkSwapchain(output, tempAllocator);
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
@@ -557,7 +598,6 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     }
 
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     vkDestroySwapchainKHR(surface->renderer->device, surface->swapchain, nil);
@@ -581,33 +621,7 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
-    VkSurfaceCapabilitiesKHR surfaceCaps;
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(surface->renderer->physicalDevice, surface->surface, &surfaceCaps));
-
-    u32 imageCount = surfaceCaps.minImageCount + 1;
-    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
-        imageCount = surfaceCaps.maxImageCount;
-
-    // ignore input width/height, use current extent from surface capabilities
-    VkSwapchainCreateInfoKHR swapchainCI = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = surface->surface,
-        .minImageCount = imageCount,
-        .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
-        .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-        .imageExtent = surfaceCaps.currentExtent,
-        .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .preTransform = surfaceCaps.currentTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR,
-        .clipped = VK_TRUE,
-        .oldSwapchain = surface->swapchain,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(surface->renderer->device, &swapchainCI, nil, &(surface->swapchain)));
-    vkDestroySwapchainKHR(surface->renderer->device, swapchainCI.oldSwapchain, nil);
+    MZNT_Internal_CreateVkSwapchain(surface, tempAllocator);
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
     return true;
