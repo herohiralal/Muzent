@@ -196,10 +196,36 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     output->parent.allocator = config.allocator;
     output->parent.appHandle = config.appHandle;
 
-    #if PNSLR_DBG
-        const char* enabledLayers[] = {"VK_LAYER_KHRONOS_validation"};
-        u32 layerCount = 1;
-    #endif
+    static const i32 k_MaxSupportedInstanceLayers = 16;
+    cstring* enabledLayers = (cstring*) PNSLR_Allocate(tempAllocator, false, k_MaxSupportedInstanceLayers * sizeof(cstring), alignof(cstring), PNSLR_GET_LOC(), nil);
+    u32 enabledLayersCount = 0;
+
+    u32 availableLayerCount = 0;
+    vkEnumerateInstanceLayerProperties(&availableLayerCount, nil);
+    PNSLR_ArraySlice(VkLayerProperties) availableLayers = PNSLR_MakeSlice(VkLayerProperties, availableLayerCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+    vkEnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data);
+    availableLayers.count = (i64) availableLayerCount;
+
+    for (i64 i = 0; i < availableLayers.count; i++)
+    {
+        VkLayerProperties* layer = &availableLayers.data[i];
+
+        if (PNSLR_DBG && PNSLR_AreCStringsEqual(layer->layerName, "VK_LAYER_KHRONOS_validation", 0))
+        {
+            enabledLayers[enabledLayersCount++] = &(layer->layerName[0]);
+            PNSLR_LogI(PNSLR_StringLiteral("Found validation layers in vulkan. Enabling."), PNSLR_GET_LOC());
+            continue;
+        }
+
+        PNSLR_LogIf(
+            PNSLR_StringLiteral("Skipped, but available layer: $ ($)."),
+            PNSLR_FmtArgs(
+                PNSLR_FmtCString((cstring) &(layer->layerName[0])),
+                PNSLR_FmtCString((cstring) &(layer->description[0]))
+            ),
+            PNSLR_GET_LOC()
+        );
+    }
 
     const char* enabledExtensions[] =
     {
@@ -238,7 +264,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .flags = 0,
         .pApplicationInfo = &appInfo,
         #if PNSLR_DBG
-            .enabledLayerCount = layerCount,
+            .enabledLayerCount = enabledLayersCount,
             .ppEnabledLayerNames = enabledLayers,
         #endif
         .enabledExtensionCount = extensionCount,

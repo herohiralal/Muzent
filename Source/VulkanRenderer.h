@@ -4,6 +4,7 @@
 #include "Renderer.h"
 EXTERN_C_BEGIN
 
+PNSLR_DECLARE_ARRAY_SLICE(VkLayerProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkPhysicalDevice);
 PNSLR_DECLARE_ARRAY_SLICE(VkQueueFamilyProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkDeviceQueueCreateInfo);
