@@ -3,6 +3,9 @@
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
+#define INLINED_FILE_INCLUSION_NAME k_TriangleShader
+#include "Shaders/triangle_spv.c"
+
 VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT types,
@@ -337,10 +340,22 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .synchronization2 = VK_TRUE,
     };
 
+    VkPhysicalDeviceDynamicRenderingFeatures dynaRendFeatauures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+        .pNext = &sync2Features,
+        .dynamicRendering = VK_TRUE,
+    };
+
+    VkPhysicalDeviceShaderDrawParametersFeatures shaderDrawParamsFeatures = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
+        .pNext = &dynaRendFeatauures,
+        .shaderDrawParameters = VK_TRUE,
+    };
+
     VkDeviceCreateInfo deviceCreateInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &sync2Features,
+        .pNext = &shaderDrawParamsFeatures,
         .queueCreateInfoCount = (u32) qcis.count,
         .pQueueCreateInfos = qcis.data,
         .enabledExtensionCount = enabledDeviceExtensionCount,
@@ -373,12 +388,31 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
 
+    // triangle shader pipeline
+    {
+        VkShaderModuleCreateInfo triangleShMCi = {
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = (size_t) k_TriangleShaderSize,
+            .pCode = (u32*) k_TriangleShaderContents,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &triangleShMCi, nil, &output->triangleShader.module));
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &pipelineLayoutInfo, nil, &output->triangleShader.layout));
+    }
+
     return output;
 }
 
 b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return false;
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
+
+    vkDestroyPipelineLayout(renderer->device, renderer->triangleShader.layout, nil);
+    vkDestroyShaderModule(renderer->device, renderer->triangleShader.module, nil);
 
     vmaDestroyAllocator(renderer->vmaAllocator);
 
@@ -441,13 +475,13 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
         FORCE_DBG_TRAP;
     }
 
-    VkSurfaceFormatKHR selectedFormat = surfaceFormats.data[0];
+    surface->swapchainImageFormat = surfaceFormats.data[0];
     for (i64 i = 0; i < surfaceFormats.count; i++)
     {
         if (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
             surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
         {
-            selectedFormat = surfaceFormats.data[i];
+            surface->swapchainImageFormat = surfaceFormats.data[i];
             break;
         }
     }
@@ -456,8 +490,8 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface->surface,
         .minImageCount = imageCount,
-        .imageFormat = selectedFormat.format,
-        .imageColorSpace = selectedFormat.colorSpace,
+        .imageFormat = surface->swapchainImageFormat.format,
+        .imageColorSpace = surface->swapchainImageFormat.colorSpace,
         .imageExtent = surfaceCaps.currentExtent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -599,6 +633,80 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
     }
 
+    {
+        VkPipelineShaderStageCreateInfo triangleShaderStages[] = {
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = renderer->triangleShader.module,
+                .pName  = "vertMain",
+            },
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = renderer->triangleShader.module,
+                .pName  = "fragMain",
+            },
+        };
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
+        VkPipelineViewportStateCreateInfo viewportState = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1};
+
+        VkPipelineRasterizationStateCreateInfo rasterizer = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+            .depthClampEnable = VK_FALSE,
+            .rasterizerDiscardEnable = VK_FALSE,
+            .polygonMode = VK_POLYGON_MODE_FILL,
+            .cullMode = VK_CULL_MODE_BACK_BIT,
+            .frontFace = VK_FRONT_FACE_CLOCKWISE,
+            .depthBiasEnable = VK_FALSE,
+            .depthBiasSlopeFactor = 1.0f,
+            .lineWidth = 1.0f,
+        };
+
+        VkPipelineMultisampleStateCreateInfo multisampling = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
+        VkPipelineColorBlendAttachmentState colorBlendAttachment = {.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
+        VkPipelineColorBlendStateCreateInfo colorBlending = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+            .logicOpEnable = VK_FALSE,
+            .logicOp = VK_LOGIC_OP_COPY,
+            .attachmentCount = 1,
+            .pAttachments = &colorBlendAttachment,
+        };
+
+        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        VkPipelineDynamicStateCreateInfo dynamicState = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+            .dynamicStateCount = sizeof(dynamicStates) / sizeof(VkDynamicState),
+            .pDynamicStates = dynamicStates,
+        };
+
+        VkPipelineRenderingCreateInfo renderingCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &output->swapchainImageFormat.format,
+        };
+
+        VkGraphicsPipelineCreateInfo pipelineInfo = {
+            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .pNext = &renderingCreateInfo,
+            .stageCount = sizeof(triangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages = triangleShaderStages,
+            .pVertexInputState = &vertexInputInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicState,
+            .layout = renderer->triangleShader.layout,
+            .renderPass = VK_NULL_HANDLE,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, nil, &output->trianglePipeline));
+    }
+
     return output;
 }
 
@@ -608,6 +716,8 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     if (!surface->renderer) FORCE_DBG_TRAP;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+
+    vkDestroyPipeline(surface->renderer->device, surface->trianglePipeline, nil);
 
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)

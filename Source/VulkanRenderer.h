@@ -14,6 +14,12 @@ PNSLR_DECLARE_ARRAY_SLICE(VkPresentModeKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkFence);
 PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
 
+typedef struct MZNT_VulkanShader
+{
+    VkShaderModule   module;
+    VkPipelineLayout layout;
+} MZNT_VulkanShader;
+
 typedef struct MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
@@ -29,6 +35,8 @@ typedef struct MZNT_VulkanRenderer
     VkQueue          presQueue;
 
     VmaAllocator     vmaAllocator;
+
+    MZNT_VulkanShader triangleShader;
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
@@ -47,9 +55,11 @@ typedef struct MZNT_VulkanRendererSurface
     MZNT_VulkanRenderer*          renderer;
     VkSurfaceKHR                  surface;
     VkSwapchainKHR                swapchain;
+    VkSurfaceFormatKHR            swapchainImageFormat;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;
     VkCommandPool                 cmdPool;
+    VkPipeline                    trianglePipeline;
 
     u32                              curFrame;
     u32                              semIdx;
