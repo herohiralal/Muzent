@@ -1,4 +1,4 @@
-// generated from ShaderBytecodestriangle-tmpout-vk-1760009608711710900.tmpShahdr, do not edit
+// generated from triangle.slang, do not edit
 #ifndef INLINED_FILE_INCLUSION_NAME
     #error "You must define INLINED_FILE_INCLUSION_NAME to be the name of the inlined file (without extension)"
 #else

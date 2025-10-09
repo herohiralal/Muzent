@@ -43,7 +43,7 @@ def compileShader(
     ):
         return False
 
-    metaprogdumpfile.run(intermFile, outputFile)
+    metaprogdumpfile.run(inputPath.name, intermFile, outputFile)
     os.remove(intermFile)
     return True
 
@@ -56,8 +56,13 @@ TRIANGLE_SPIRV_FILE     = FOLDER_STRUCTURE.tmpDir + 'Shaders/triangle.spv'
 TRIANGLE_SPIRV_SRC_FILE = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_spv.c'
 TRIANGLE_DXIL_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_dxil.c'
 
-def recompileShaders():
-    compileShader(SHADER_COMPILE_MODE_VK, TRIANGLE_SLANG_FILE, ['vertMain', 'fragMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_SPIRV_SRC_FILE)
+def recompileShaders() -> bool:
+    success = True
+
+    if not compileShader(SHADER_COMPILE_MODE_VK, TRIANGLE_SLANG_FILE, ['vertMain', 'fragMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_SPIRV_SRC_FILE):
+        success = False
+
+    return success
 
 if __name__ == '__main__':
     recompileShaders()
