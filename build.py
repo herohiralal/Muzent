@@ -44,6 +44,7 @@ def compileShader(
         return False
 
     metaprogdumpfile.run(intermFile, outputFile)
+    os.remove(intermFile)
     return True
 
 FOLDER_STRUCTURE = buildutils.getFolderStructure(os.path.dirname(os.path.abspath(__file__)))
