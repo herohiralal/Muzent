@@ -5,6 +5,7 @@
 EXTERN_C_BEGIN
 
 PNSLR_DECLARE_ARRAY_SLICE(VkLayerProperties);
+PNSLR_DECLARE_ARRAY_SLICE(VkExtensionProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkPhysicalDevice);
 PNSLR_DECLARE_ARRAY_SLICE(VkQueueFamilyProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkDeviceQueueCreateInfo);
@@ -25,15 +26,14 @@ typedef struct MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
     VkInstance       instance;
-    #if PNSLR_DBG
-        VkDebugUtilsMessengerEXT debugMessenger;
-    #endif
     VkPhysicalDevice physicalDevice;
     VkDevice         device;
     u32              gfxQueueFamilyIndex;
     u32              presQueueFamilyIndex;
     VkQueue          gfxQueue;
     VkQueue          presQueue;
+
+    VkDebugUtilsMessengerEXT debugMessenger;
 
     VmaAllocator     vmaAllocator;
 

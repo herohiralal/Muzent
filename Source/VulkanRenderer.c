@@ -206,12 +206,14 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     vkEnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data);
     availableLayers.count = (i64) availableLayerCount;
 
+    b8 validationLayersEnabled = false;
     for (i64 i = 0; i < availableLayers.count; i++)
     {
         VkLayerProperties* layer = &availableLayers.data[i];
 
         if (PNSLR_DBG && PNSLR_AreCStringsEqual(layer->layerName, "VK_LAYER_KHRONOS_validation", 0))
         {
+            validationLayersEnabled = true;
             enabledLayers[enabledLayersCount++] = &(layer->layerName[0]);
             PNSLR_LogI(PNSLR_StringLiteral("Found validation layers in vulkan. Enabling."), PNSLR_GET_LOC());
             continue;
@@ -227,24 +229,64 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         );
     }
 
-    const char* enabledExtensions[] =
-    {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        #if PNSLR_WINDOWS
-            VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-        #elif PNSLR_LINUX
-            VK_KHR_XCB_SURFACE_EXTENSION_NAME,
-        #elif PNSLR_ANDROID
-            VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
-        #elif PNSLR_APPLE
-            VK_EXT_METAL_SURFACE_EXTENSION_NAME,
-        #endif
-        #if PNSLR_DBG
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-        #endif
-    };
+    static const i32 k_MaxSupportedInstanceExtensions = 16;
+    cstring* enabledExtensions = (cstring*) PNSLR_Allocate(tempAllocator, false, k_MaxSupportedInstanceExtensions * sizeof(cstring), alignof(cstring), PNSLR_GET_LOC(), nil);
+    u32 enabledExtensionsCount = 0;
 
-    u32 extensionCount = sizeof(enabledExtensions) / sizeof(char*);
+    u32 availableExtensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nil, &availableExtensionCount, nil);
+    PNSLR_ArraySlice(VkExtensionProperties) availableExtensions = PNSLR_MakeSlice(VkExtensionProperties, availableExtensionCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+    vkEnumerateInstanceExtensionProperties(nil, &availableExtensionCount, availableExtensions.data);
+    availableExtensions.count = (i64) availableExtensionCount;
+
+    for (i64 i = 0; i < availableExtensions.count; i++)
+    {
+        VkExtensionProperties* ext = &availableExtensions.data[i];
+
+        if (PNSLR_AreCStringsEqual(ext->extensionName, VK_KHR_SURFACE_EXTENSION_NAME, 0))
+        {
+            enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+            continue;
+        }
+
+        #if PNSLR_WINDOWS
+            if (PNSLR_AreCStringsEqual(ext->extensionName, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, 0))
+            {
+                enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+                continue;
+            }
+        #endif
+
+        #if PNSLR_LINUX
+            if (PNSLR_AreCStringsEqual(ext->extensionName, VK_KHR_XCB_SURFACE_EXTENSION_NAME, 0))
+            {
+                enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+                continue;
+            }
+        #endif
+
+        #if PNSLR_ANDROID
+            if (PNSLR_AreCStringsEqual(ext->extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME, 0))
+            {
+                enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+                continue;
+            }
+        #endif
+
+        #if PNSLR_APPLE
+            if (PNSLR_AreCStringsEqual(ext->extensionName, VK_EXT_METAL_SURFACE_EXTENSION_NAME, 0))
+            {
+                enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+                continue;
+            }
+        #endif
+
+        if (validationLayersEnabled && PNSLR_AreCStringsEqual(ext->extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME, 0))
+        {
+            enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+            continue;
+        }
+    }
 
     VkApplicationInfo appInfo =
     {
@@ -263,11 +305,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .pNext = nil,
         .flags = 0,
         .pApplicationInfo = &appInfo,
-        #if PNSLR_DBG
-            .enabledLayerCount = enabledLayersCount,
-            .ppEnabledLayerNames = enabledLayers,
-        #endif
-        .enabledExtensionCount = extensionCount,
+        .enabledLayerCount = enabledLayersCount,
+        .ppEnabledLayerNames = enabledLayers,
+        .enabledExtensionCount = enabledExtensionsCount,
         .ppEnabledExtensionNames = enabledExtensions,
     };
 
@@ -275,7 +315,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     volkLoadInstanceOnly(output->instance);
 
-    #if PNSLR_DBG
+    if (validationLayersEnabled)
+    {
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo =
         {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -292,7 +333,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDebugUtilsMessengerEXT(output->instance, &debugCreateInfo, nil, &output->debugMessenger));
-    #endif
+    }
 
     u32 deviceCount = 0;
     vkEnumeratePhysicalDevices(output->instance, &deviceCount, nil);
@@ -312,11 +353,22 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         VkPhysicalDeviceProperties2 deviceProperties = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
         vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
 
+        PNSLR_LogIf(
+            PNSLR_StringLiteral("Device: $. ty: $. bda: $. descidx: $. dyren: $. sync2: $."),
+            PNSLR_FmtArgs(
+                PNSLR_FmtCString(deviceProperties.properties.deviceName),
+                PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
+                PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
+                PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing),
+                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering)
+            ),
+            PNSLR_GET_LOC()
+        );
+
         if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
             deviceFeatures12.bufferDeviceAddress &&
             deviceFeatures12.descriptorIndexing &&
-            deviceFeatures13.dynamicRendering &&
-            deviceFeatures13.synchronization2)
+            deviceFeatures13.dynamicRendering)
         {
             selectedDevice = devices.data[i];
             break;
@@ -372,14 +424,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
 
-    VkPhysicalDeviceSynchronization2FeaturesKHR sync2Features = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
-        .synchronization2 = VK_TRUE,
-    };
-
     VkPhysicalDeviceDynamicRenderingFeatures dynaRendFeatauures = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-        .pNext = &sync2Features,
         .dynamicRendering = VK_TRUE,
     };
 
@@ -455,9 +501,8 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
 
     vkDestroyDevice(renderer->device, nil);
 
-    #if PNSLR_DBG
+    if (renderer->debugMessenger != VK_NULL_HANDLE)
         vkDestroyDebugUtilsMessengerEXT(renderer->instance, renderer->debugMessenger, nil);
-    #endif
 
     vkDestroyInstance(renderer->instance, nil);
 
@@ -824,18 +869,16 @@ void MZNT_Internal_TransitionVkImage(
     VkImage image,
     VkImageLayout srcLayout,
     VkImageLayout dstLayout,
-    VkAccessFlags2 srcAccess,
-    VkAccessFlags2 dstAccess,
-    VkPipelineStageFlags2 srcStage,
-    VkPipelineStageFlags2 dstStage
+    VkAccessFlags srcAccess,
+    VkAccessFlags dstAccess,
+    VkPipelineStageFlags srcStage,
+    VkPipelineStageFlags dstStage
 )
 {
-    VkImageMemoryBarrier2 imageBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+    VkImageMemoryBarrier imageBarrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext = nil,
-        .srcStageMask = srcStage,
         .srcAccessMask = srcAccess,
-        .dstStageMask = dstStage,
         .dstAccessMask = dstAccess,
         .oldLayout = srcLayout,
         .newLayout = dstLayout,
@@ -849,14 +892,14 @@ void MZNT_Internal_TransitionVkImage(
         .image = image,
     };
 
-    VkDependencyInfo depInfo = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .pNext = nil,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &imageBarrier,
-    };
-
-    vkCmdPipelineBarrier2(cmd, &depInfo);
+    vkCmdPipelineBarrier(
+        cmd,
+        srcStage, dstStage,
+        0,
+        0, nil,
+        0, nil,
+        1, &imageBarrier
+    );
 }
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
@@ -880,10 +923,10 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         surface->swapchainImages.data[surface->curSwpchImgIdx],
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL,
-        VK_ACCESS_2_MEMORY_WRITE_BIT,
-        VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT
+        VK_ACCESS_MEMORY_WRITE_BIT,
+        VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
     );
 
     // clear frame buffer
@@ -950,46 +993,26 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         surface->swapchainImages.data[surface->curSwpchImgIdx],
         VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_ACCESS_2_MEMORY_WRITE_BIT,
-        VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT
+        VK_ACCESS_MEMORY_WRITE_BIT,
+        VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
     );
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
 
-    VkCommandBufferSubmitInfo cmdSubmitInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .commandBuffer = cmdBuf->cmdBuffer,
+    VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &(surface->presentCompleteSemaphores.data[surface->semIdx]),
+        .pWaitDstStageMask = (VkPipelineStageFlags[]) {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
+        .commandBufferCount = 1,
+        .pCommandBuffers = &(cmdBuf->cmdBuffer),
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &(surface->renderFinishedSemaphores.data[surface->curSwpchImgIdx]),
     };
 
-    VkSemaphoreSubmitInfo waitInfo = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = surface->presentCompleteSemaphores.data[surface->semIdx],
-        .value = 1,
-        .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-    };
-
-    VkSemaphoreSubmitInfo signalInfo = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .semaphore = surface->renderFinishedSemaphores.data[surface->curSwpchImgIdx],
-        .value = 1,
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
-    };
-
-    VkSubmitInfo2 submitInfo = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .pNext = nil,
-        .flags = 0,
-        .waitSemaphoreInfoCount = 1,
-        .pWaitSemaphoreInfos = &waitInfo,
-        .commandBufferInfoCount = 1,
-        .pCommandBufferInfos = &cmdSubmitInfo,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signalInfo,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit2(surface->renderer->gfxQueue, 1, &submitInfo, surface->inFlightFences.data[surface->curFrame]));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit(surface->renderer->gfxQueue, 1, &submitInfo, surface->inFlightFences.data[surface->curFrame]));
 
     VkPresentInfoKHR presentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
