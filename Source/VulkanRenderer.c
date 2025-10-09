@@ -359,16 +359,14 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
                 PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
                 PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
-                PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing),
-                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering)
+                PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing)
             ),
             PNSLR_GET_LOC()
         );
 
         if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
             deviceFeatures12.bufferDeviceAddress &&
-            deviceFeatures12.descriptorIndexing &&
-            deviceFeatures13.dynamicRendering)
+            deviceFeatures12.descriptorIndexing)
         {
             selectedDevice = devices.data[i];
             break;
@@ -419,19 +417,12 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SPIRV_1_4_EXTENSION_NAME,
-        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     };
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
 
-    VkPhysicalDeviceDynamicRenderingFeatures dynaRendFeatauures = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-        .dynamicRendering = VK_TRUE,
-    };
-
     VkPhysicalDeviceShaderDrawParametersFeatures shaderDrawParamsFeatures = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
-        .pNext = &dynaRendFeatauures,
         .shaderDrawParameters = VK_TRUE,
     };
 
@@ -713,6 +704,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
     output->presentCompleteSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     output->renderFinishedSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     output->inFlightFences = PNSLR_MakeSlice(VkFence, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    output->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     for (i64 i = 0; i < imgCount; i++)
     {
@@ -722,6 +714,56 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
         VkFenceCreateInfo fenceCI = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
+    }
+
+    VkRenderPassCreateInfo rpci = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .attachmentCount = 1,
+        .pAttachments = &(VkAttachmentDescription) {
+            .format = output->swapchainImageFormat.format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        },
+        .subpassCount = 1,
+        .pSubpasses = &(VkSubpassDescription) {
+            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &(VkAttachmentReference) {
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            },
+        },
+        .dependencyCount = 1,
+        .pDependencies = &(VkSubpassDependency) {
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = 0,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        },
+    };
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(renderer->device, &rpci, nil, &output->mainPass));
+
+    for (i64 i = 0; i < imgCount; i++)
+    {
+        VkFramebufferCreateInfo fbi = {
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass = output->mainPass,
+            .attachmentCount = 1,
+            .pAttachments = &output->swapchainImageViews.data[i],
+            .width = output->swapchainExtent.width,
+            .height = output->swapchainExtent.height,
+            .layers = 1,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(renderer->device, &fbi, nil, &output->swapchainFramebuffers.data[i]));
     }
 
     {
@@ -792,7 +834,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
             .pColorBlendState = &colorBlending,
             .pDynamicState = &dynamicState,
             .layout = renderer->triangleShader.layout,
-            .renderPass = VK_NULL_HANDLE,
+            .renderPass = output->mainPass,
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, nil, &output->trianglePipeline));
@@ -810,6 +852,13 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     vkDestroyPipeline(surface->renderer->device, surface->trianglePipeline, nil);
 
+    for (i64 i = 0; i < surface->swapchainFramebuffers.count; i++)
+    {
+        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
+    }
+
+    vkDestroyRenderPass(surface->renderer->device, surface->mainPass, nil);
+
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)
     {
@@ -818,6 +867,7 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
         vkDestroySemaphore(surface->renderer->device, surface->presentCompleteSemaphores.data[i], nil);
     }
 
+    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->renderFinishedSemaphores), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->presentCompleteSemaphores), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->inFlightFences), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -852,15 +902,37 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueWaitIdle(surface->renderer->gfxQueue));
 
+    for (i64 i = 0; i < surface->swapchainFramebuffers.count; i++)
+        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
+
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
 
+    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     MZNT_Internal_CreateVkSwapchain(surface, tempAllocator);
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
+
+    surface->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    for (i64 i = 0; i < surface->swapchainImages.count; i++)
+    {
+        VkFramebufferCreateInfo fbi = {
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass = surface->mainPass,
+            .attachmentCount = 1,
+            .pAttachments = &surface->swapchainImageViews.data[i],
+            .width = surface->swapchainExtent.width,
+            .height = surface->swapchainExtent.height,
+            .layers = 1,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(surface->renderer->device, &fbi, nil, &surface->swapchainFramebuffers.data[i]));
+    }
+
     return true;
 }
 
@@ -918,50 +990,16 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkBeginCommandBuffer(cmdBuf->cmdBuffer, &cmdBufBI));
 
-    MZNT_Internal_TransitionVkImage(
-        cmdBuf->cmdBuffer,
-        surface->swapchainImages.data[surface->curSwpchImgIdx],
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_ACCESS_MEMORY_WRITE_BIT,
-        VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
-    );
+    vkCmdBeginRenderPass(cmdBuf->cmdBuffer, &(VkRenderPassBeginInfo)
+    {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .renderPass = surface->mainPass,
+        .framebuffer = surface->swapchainFramebuffers.data[surface->curSwpchImgIdx],
+        .renderArea = {.offset = {0, 0}, .extent = surface->swapchainExtent},
+        .clearValueCount = 1,
+        .pClearValues = &(VkClearValue){.color = {.float32 = {r, g, b, a}}},
+    }, VK_SUBPASS_CONTENTS_INLINE);
 
-    // clear frame buffer
-    // VkClearColorValue clearColour = {.float32 = {r, g, b, a}};
-    // VkImageSubresourceRange clearRange = {
-    //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-    //     .baseMipLevel = 0,
-    //     .levelCount = VK_REMAINING_MIP_LEVELS,
-    //     .baseArrayLayer = 0,
-    //     .layerCount = VK_REMAINING_ARRAY_LAYERS,
-    // };
-    // vkCmdClearColorImage(cmdBuf->cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_GENERAL, &clearColour, 1, &clearRange);
-
-    VkRenderingInfo renderingInfo = {
-        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = surface->swapchainExtent,
-        },
-        .layerCount = 1,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = (VkRenderingAttachmentInfo[])
-        {
-            {
-                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-                .imageView = surface->swapchainImageViews.data[surface->curSwpchImgIdx],
-                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .clearValue = {.color = {.float32 = {r, g, b, a}}},
-            },
-        },
-    };
-
-    vkCmdBeginRendering(cmdBuf->cmdBuffer, &renderingInfo);
 
     vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
 
@@ -986,18 +1024,7 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
 {
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
 
-    vkCmdEndRendering(cmdBuf->cmdBuffer);
-
-    MZNT_Internal_TransitionVkImage(
-        cmdBuf->cmdBuffer,
-        surface->swapchainImages.data[surface->curSwpchImgIdx],
-        VK_IMAGE_LAYOUT_GENERAL,
-        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_ACCESS_MEMORY_WRITE_BIT,
-        VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
-    );
+    vkCmdEndRenderPass(cmdBuf->cmdBuffer);
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
 

@@ -12,6 +12,7 @@ PNSLR_DECLARE_ARRAY_SLICE(VkDeviceQueueCreateInfo);
 PNSLR_DECLARE_ARRAY_SLICE(VkSurfaceFormatKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkImage);
 PNSLR_DECLARE_ARRAY_SLICE(VkImageView);
+PNSLR_DECLARE_ARRAY_SLICE(VkFramebuffer);
 PNSLR_DECLARE_ARRAY_SLICE(VkPresentModeKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkFence);
 PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
@@ -60,7 +61,11 @@ typedef struct MZNT_VulkanRendererSurface
     VkSurfaceFormatKHR            swapchainImageFormat;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+    PNSLR_ArraySlice(VkFramebuffer) swapchainFramebuffers;
     VkCommandPool                 cmdPool;
+
+    VkRenderPass mainPass;
+
     VkPipeline                    trianglePipeline;
 
     u32                              curFrame;
