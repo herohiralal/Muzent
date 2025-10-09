@@ -313,6 +313,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateWin32SurfaceKHR(output->instance, &surfaceCreateInfo, nil, &tempSurfaceForQueueSelect));
+    #elif PNSLR_ANDROID
+        ANativeWindow* window = ((struct android_app*) config.appHandle.handle)->window;
+        VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+            .window = window,
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateAndroidSurfaceKHR(output->instance, &surfaceCreateInfo, nil, &tempSurfaceForQueueSelect));
     #else
         #error "unimplemented"
     #endif
@@ -322,6 +331,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     vkDestroySurfaceKHR(output->instance, tempSurfaceForQueueSelect, nil);
     #if PNSLR_WINDOWS
         DestroyWindow(tempWindow);
+    #elif PNSLR_ANDROID
+        // nothing to do
     #else
         #error "unimplemented"
     #endif
@@ -584,6 +595,14 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateWin32SurfaceKHR(renderer->instance, &createInfo, nil, &output->surface));
+    #elif PNSLR_ANDROID
+        VkAndroidSurfaceCreateInfoKHR createInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+            .window = (ANativeWindow*) (windowHandle.handle),
+        };
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateAndroidSurfaceKHR(renderer->instance, &createInfo, nil, &output->surface));
     #else
         #error "unimplemented"
     #endif

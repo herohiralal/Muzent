@@ -32,6 +32,7 @@ PNSLR_SUPPRESS_WARN
         #define VK_USE_PLATFORM_WIN32_KHR
     #elif PNSLR_ANDROID
         #define VK_USE_PLATFORM_ANDROID_KHR
+        #include "Dependencies/AndroidGameActivity/game-activity/android_native_app_glue.h"
     #elif PNSLR_LINUX
         #define VK_USE_PLATFORM_XLIB_KHR
     #endif
