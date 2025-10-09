@@ -55,6 +55,7 @@ typedef struct MZNT_VulkanRendererSurface
     MZNT_VulkanRenderer*          renderer;
     VkSurfaceKHR                  surface;
     VkSwapchainKHR                swapchain;
+    VkExtent2D                    swapchainExtent;
     VkSurfaceFormatKHR            swapchainImageFormat;
     PNSLR_ArraySlice(VkImage)     swapchainImages;
     PNSLR_ArraySlice(VkImageView) swapchainImageViews;

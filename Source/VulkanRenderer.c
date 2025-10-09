@@ -486,13 +486,14 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
         }
     }
 
+    surface->swapchainExtent = surfaceCaps.currentExtent;
     VkSwapchainCreateInfoKHR swapchainCI = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface->surface,
         .minImageCount = imageCount,
         .imageFormat = surface->swapchainImageFormat.format,
         .imageColorSpace = surface->swapchainImageFormat.colorSpace,
-        .imageExtent = surfaceCaps.currentExtent,
+        .imageExtent = surface->swapchainExtent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .preTransform = surfaceCaps.currentTransform,
@@ -841,15 +842,54 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
     );
 
     // clear frame buffer
-    VkClearColorValue clearColour = {.float32 = {r, g, b, a}};
-    VkImageSubresourceRange clearRange = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = VK_REMAINING_MIP_LEVELS,
-        .baseArrayLayer = 0,
-        .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    // VkClearColorValue clearColour = {.float32 = {r, g, b, a}};
+    // VkImageSubresourceRange clearRange = {
+    //     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    //     .baseMipLevel = 0,
+    //     .levelCount = VK_REMAINING_MIP_LEVELS,
+    //     .baseArrayLayer = 0,
+    //     .layerCount = VK_REMAINING_ARRAY_LAYERS,
+    // };
+    // vkCmdClearColorImage(cmdBuf->cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_GENERAL, &clearColour, 1, &clearRange);
+
+    VkRenderingInfo renderingInfo = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = surface->swapchainExtent,
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = (VkRenderingAttachmentInfo[])
+        {
+            {
+                .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                .imageView = surface->swapchainImageViews.data[surface->curSwpchImgIdx],
+                .imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .clearValue = {.color = {.float32 = {r, g, b, a}}},
+            },
+        },
     };
-    vkCmdClearColorImage(cmdBuf->cmdBuffer, surface->swapchainImages.data[surface->curSwpchImgIdx], VK_IMAGE_LAYOUT_GENERAL, &clearColour, 1, &clearRange);
+
+    vkCmdBeginRendering(cmdBuf->cmdBuffer, &renderingInfo);
+
+    vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
+
+    vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
+    {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (f32) surface->swapchainExtent.width,
+        .height = (f32) surface->swapchainExtent.height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    });
+
+    vkCmdSetScissor(cmdBuf->cmdBuffer, 0, 1, &(VkRect2D){.offset = {0, 0}, .extent = surface->swapchainExtent});
+
+    vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
 
     return cmdBuf;
 }
@@ -857,6 +897,8 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
 b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator)
 {
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
+
+    vkCmdEndRendering(cmdBuf->cmdBuffer);
 
     MZNT_Internal_TransitionVkImage(
         cmdBuf->cmdBuffer,
