@@ -531,28 +531,6 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
         }
     }
 
-    u32 formatCount = 0;
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(surface->renderer->physicalDevice, surface->surface, &formatCount, nil));
-    PNSLR_ArraySlice(VkSurfaceFormatKHR) surfaceFormats = PNSLR_MakeSlice(VkSurfaceFormatKHR, formatCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(surface->renderer->physicalDevice, surface->surface, &formatCount, surfaceFormats.data));
-
-    if (formatCount == 0)
-    {
-        PNSLR_LogE(PNSLR_StringLiteral("Failed to get any surface formats for swapchain"), PNSLR_GET_LOC());
-        FORCE_DBG_TRAP;
-    }
-
-    surface->swapchainImageFormat = surfaceFormats.data[0];
-    for (i64 i = 0; i < surfaceFormats.count; i++)
-    {
-        if (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
-            surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-        {
-            surface->swapchainImageFormat = surfaceFormats.data[i];
-            break;
-        }
-    }
-
     surface->swapchainExtent = surfaceCaps.currentExtent;
     VkSwapchainCreateInfoKHR swapchainCI = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -607,7 +585,8 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
         surface->swapchainImageViews = PNSLR_MakeSlice(VkImageView, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
         for (i64 i = 0; i < surface->swapchainImages.count; i++)
         {
-            VkImageViewCreateInfo ivCreateInfo = {
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(surface->renderer->device, &(VkImageViewCreateInfo)
+            {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .image = surface->swapchainImages.data[i],
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -625,9 +604,25 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
                     .baseArrayLayer = 0,
                     .layerCount = 1,
                 },
+            }, nil, &(surface->swapchainImageViews.data[i])));
+        }
+    }
+
+    {
+        surface->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        for (i64 i = 0; i < surface->swapchainImages.count; i++)
+        {
+            VkFramebufferCreateInfo fbi = {
+                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                .renderPass = surface->mainPass,
+                .attachmentCount = 1,
+                .pAttachments = &surface->swapchainImageViews.data[i],
+                .width = surface->swapchainExtent.width,
+                .height = surface->swapchainExtent.height,
+                .layers = 1,
             };
 
-            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(surface->renderer->device, &ivCreateInfo, nil, &(surface->swapchainImageViews.data[i])));
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(surface->renderer->device, &fbi, nil, &surface->swapchainFramebuffers.data[i]));
         }
     }
 }
@@ -643,25 +638,84 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
     output->renderer    = renderer;
 
     #if PNSLR_WINDOWS
-        VkWin32SurfaceCreateInfoKHR createInfo =
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateWin32SurfaceKHR(renderer->instance, &(VkWin32SurfaceCreateInfoKHR)
         {
             .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
             .hinstance = (HINSTANCE)(uintptr_t) (renderer->parent.appHandle.handle),
             .hwnd      = (HWND)(uintptr_t) (windowHandle.handle),
-        };
+        }, nil, &output->surface));
 
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateWin32SurfaceKHR(renderer->instance, &createInfo, nil, &output->surface));
     #elif PNSLR_ANDROID
-        VkAndroidSurfaceCreateInfoKHR createInfo =
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateAndroidSurfaceKHR(renderer->instance, &(VkAndroidSurfaceCreateInfoKHR)
         {
             .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
             .window = (ANativeWindow*) (windowHandle.handle),
-        };
+        }, nil, &output->surface));
 
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateAndroidSurfaceKHR(renderer->instance, &createInfo, nil, &output->surface));
     #else
         #error "unimplemented"
     #endif
+
+    // select surface format type
+    {
+        u32 formatCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(output->renderer->physicalDevice, output->surface, &formatCount, nil));
+        PNSLR_ArraySlice(VkSurfaceFormatKHR) surfaceFormats = PNSLR_MakeSlice(VkSurfaceFormatKHR, formatCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(output->renderer->physicalDevice, output->surface, &formatCount, surfaceFormats.data));
+
+        if (formatCount == 0)
+        {
+            PNSLR_LogE(PNSLR_StringLiteral("Failed to get any surface formats for swapchain"), PNSLR_GET_LOC());
+            FORCE_DBG_TRAP;
+        }
+
+        output->swapchainImageFormat = surfaceFormats.data[0];
+        for (i64 i = 0; i < surfaceFormats.count; i++)
+        {
+            if (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
+                surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            {
+                output->swapchainImageFormat = surfaceFormats.data[i];
+                break;
+            }
+        }
+    }
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(renderer->device, &(VkRenderPassCreateInfo)
+    {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .attachmentCount = 1,
+        .pAttachments = &(VkAttachmentDescription) {
+            .format = output->swapchainImageFormat.format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        },
+        .subpassCount = 1,
+        .pSubpasses = &(VkSubpassDescription) {
+            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &(VkAttachmentReference) {
+                .attachment = 0,
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            },
+        },
+        .dependencyCount = 1,
+        .pDependencies = &(VkSubpassDependency) {
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = 0,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        },
+    }, nil, &output->mainPass));
 
     MZNT_Internal_CreateVkSwapchain(output, tempAllocator);
 
@@ -698,7 +752,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
     output->presentCompleteSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     output->renderFinishedSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     output->inFlightFences = PNSLR_MakeSlice(VkFence, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-    output->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     for (i64 i = 0; i < imgCount; i++)
     {
@@ -708,56 +761,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
         VkFenceCreateInfo fenceCI = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
-    }
-
-    VkRenderPassCreateInfo rpci = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &(VkAttachmentDescription) {
-            .format = output->swapchainImageFormat.format,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        },
-        .subpassCount = 1,
-        .pSubpasses = &(VkSubpassDescription) {
-            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &(VkAttachmentReference) {
-                .attachment = 0,
-                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            },
-        },
-        .dependencyCount = 1,
-        .pDependencies = &(VkSubpassDependency) {
-            .srcSubpass = VK_SUBPASS_EXTERNAL,
-            .dstSubpass = 0,
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask = 0,
-            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        },
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(renderer->device, &rpci, nil, &output->mainPass));
-
-    for (i64 i = 0; i < imgCount; i++)
-    {
-        VkFramebufferCreateInfo fbi = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = output->mainPass,
-            .attachmentCount = 1,
-            .pAttachments = &output->swapchainImageViews.data[i],
-            .width = output->swapchainExtent.width,
-            .height = output->swapchainExtent.height,
-            .layers = 1,
-        };
-
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(renderer->device, &fbi, nil, &output->swapchainFramebuffers.data[i]));
     }
 
     {
@@ -846,13 +849,6 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     vkDestroyPipeline(surface->renderer->device, surface->trianglePipeline, nil);
 
-    for (i64 i = 0; i < surface->swapchainFramebuffers.count; i++)
-    {
-        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
-    }
-
-    vkDestroyRenderPass(surface->renderer->device, surface->mainPass, nil);
-
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)
     {
@@ -861,7 +857,6 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
         vkDestroySemaphore(surface->renderer->device, surface->presentCompleteSemaphores.data[i], nil);
     }
 
-    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->renderFinishedSemaphores), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->presentCompleteSemaphores), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->inFlightFences), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -875,13 +870,16 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
+        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
     }
 
+    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     vkDestroySwapchainKHR(surface->renderer->device, surface->swapchain, nil);
+    vkDestroyRenderPass(surface->renderer->device, surface->mainPass, nil);
     vkDestroySurfaceKHR(surface->renderer->instance, surface->surface, nil);
 
     PNSLR_Delete(surface, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -896,11 +894,11 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueWaitIdle(surface->renderer->gfxQueue));
 
-    for (i64 i = 0; i < surface->swapchainFramebuffers.count; i++)
-        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
-
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
+    {
+        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
+    }
 
     PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -909,23 +907,6 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     MZNT_Internal_CreateVkSwapchain(surface, tempAllocator);
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
-
-    surface->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-
-    for (i64 i = 0; i < surface->swapchainImages.count; i++)
-    {
-        VkFramebufferCreateInfo fbi = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass = surface->mainPass,
-            .attachmentCount = 1,
-            .pAttachments = &surface->swapchainImageViews.data[i],
-            .width = surface->swapchainExtent.width,
-            .height = surface->swapchainExtent.height,
-            .layers = 1,
-        };
-
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(surface->renderer->device, &fbi, nil, &surface->swapchainFramebuffers.data[i]));
-    }
 
     return true;
 }
