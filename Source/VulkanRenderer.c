@@ -601,9 +601,9 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
                 .subresourceRange = {
                     .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel = 0,
-                    .levelCount = 1,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
                     .baseArrayLayer = 0,
-                    .layerCount = 1,
+                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
                 },
             }, nil, &(surface->swapchainImageViews.data[i])));
         }
@@ -917,44 +917,6 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
 
     return true;
-}
-
-void MZNT_Internal_TransitionVkImage(
-    VkCommandBuffer cmd,
-    VkImage image,
-    VkImageLayout srcLayout,
-    VkImageLayout dstLayout,
-    VkAccessFlags srcAccess,
-    VkAccessFlags dstAccess,
-    VkPipelineStageFlags srcStage,
-    VkPipelineStageFlags dstStage
-)
-{
-    VkImageMemoryBarrier imageBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nil,
-        .srcAccessMask = srcAccess,
-        .dstAccessMask = dstAccess,
-        .oldLayout = srcLayout,
-        .newLayout = dstLayout,
-        .subresourceRange = {
-            .aspectMask = (dstLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = VK_REMAINING_MIP_LEVELS,
-            .baseArrayLayer = 0,
-            .layerCount = VK_REMAINING_ARRAY_LAYERS,
-        },
-        .image = image,
-    };
-
-    vkCmdPipelineBarrier(
-        cmd,
-        srcStage, dstStage,
-        0,
-        0, nil,
-        0, nil,
-        1, &imageBarrier
-    );
 }
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
