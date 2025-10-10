@@ -296,7 +296,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName = "M_U_Z_E_N_T",
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_3, // fuck it, we dyna-rendering
+        .apiVersion = VK_API_VERSION_1_1, // i'd really like to dyna-render, but alas
     };
 
     VkInstanceCreateInfo createInfo =
@@ -344,9 +344,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
     for (i64 i = 0; i < devices.count; i++)
     {
-        VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
-        VkPhysicalDeviceVulkan12Features deviceFeatures12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &deviceFeatures13};
-        VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, .pNext = &deviceFeatures12};
+        VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
         VkPhysicalDeviceFeatures2 deviceFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &deviceFeatures11};
         vkGetPhysicalDeviceFeatures2(devices.data[i], &deviceFeatures);
 
@@ -354,19 +352,19 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
 
         PNSLR_LogIf(
-            PNSLR_StringLiteral("Device: $. ty: $. bda: $. descidx: $. dyren: $. sync2: $."),
+            PNSLR_StringLiteral("Device: $. ty: $. shaddp: $."),
             PNSLR_FmtArgs(
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
                 PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
-                PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
-                PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing)
+                PNSLR_FmtB8(!!deviceFeatures11.shaderDrawParameters)
             ),
             PNSLR_GET_LOC()
         );
 
-        if (deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-            deviceFeatures12.bufferDeviceAddress &&
-            deviceFeatures12.descriptorIndexing)
+        // prefer discrete gpu on desktop
+        // want shader draw params
+        if ((!PNSLR_DESKTOP || deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) &&
+            deviceFeatures11.shaderDrawParameters)
         {
             selectedDevice = devices.data[i];
             break;
@@ -416,7 +414,6 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     const char* enabledDeviceExtensions[] =
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_SPIRV_1_4_EXTENSION_NAME,
     };
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
@@ -441,11 +438,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     volkLoadDevice(output->device);
 
-    VkDeviceQueueInfo2 gfxQueueInfo  = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = output->gfxQueueFamilyIndex,  .queueIndex = 0};
-    VkDeviceQueueInfo2 presQueueInfo = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, .queueFamilyIndex = output->presQueueFamilyIndex, .queueIndex = 0};
-
-    vkGetDeviceQueue2(output->device, &gfxQueueInfo,  &output->gfxQueue);
-    vkGetDeviceQueue2(output->device, &presQueueInfo, &output->presQueue);
+    vkGetDeviceQueue(output->device, output->gfxQueueFamilyIndex, 0, &output->gfxQueue);
+    vkGetDeviceQueue(output->device, output->presQueueFamilyIndex, 0, &output->presQueue);
 
     VmaVulkanFunctions vmaFns = {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,

@@ -25,7 +25,7 @@ def compileShader(
     intermFile = intermDir + 'ShaderBytecodes' + inputPath.stem + '-tmpout-' + mode + '-' + str(currNsSinceUnixEpoch) + '.tmpShahdr'
     compileCommmand: list[str] = ['slangc.exe' if sys.platform == 'win32' else 'slangc', inputFile]
     if mode == SHADER_COMPILE_MODE_VK:
-        compileCommmand += ['-target', 'spirv', '-profile', 'spirv_1_4', '-emit-spirv-directly', '-fvk-use-entrypoint-name']
+        compileCommmand += ['-target', 'spirv', '-profile', 'spirv_1_3', '-emit-spirv-directly', '-fvk-use-entrypoint-name']
         for ep in entryPts:
             compileCommmand += ['-entry', ep]
     elif mode == SHADER_COMPILE_MODE_DX12:
