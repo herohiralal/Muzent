@@ -532,6 +532,7 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
     }
 
     surface->swapchainExtent = surfaceCaps.currentExtent;
+    PNSLR_LogDf(PNSLR_StringLiteral("Swapchain extent: $x$"), PNSLR_FmtArgs(PNSLR_FmtU32(surface->swapchainExtent.width, 0), PNSLR_FmtU32(surface->swapchainExtent.height, 0)), PNSLR_GET_LOC());
     VkSwapchainCreateInfoKHR swapchainCI = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface->surface,
@@ -540,7 +541,7 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
         .imageColorSpace = surface->swapchainImageFormat.colorSpace,
         .imageExtent = surface->swapchainExtent,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .preTransform = surfaceCaps.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = selectedPresentMode,
@@ -590,7 +591,7 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .image = surface->swapchainImages.data[i],
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = VK_FORMAT_B8G8R8A8_UNORM,
+                .format = surface->swapchainImageFormat.format,
                 .components = {
                     .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                     .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -674,12 +675,18 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         output->swapchainImageFormat = surfaceFormats.data[0];
         for (i64 i = 0; i < surfaceFormats.count; i++)
         {
-            if (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
-                surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-            {
-                output->swapchainImageFormat = surfaceFormats.data[i];
-                break;
-            }
+            #if PNSLR_DESKTOP
+                if (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
+                    surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            #elif PNSLR_ANDROID
+                if (surfaceFormats.data[i].format == VK_FORMAT_R8G8B8A8_UNORM)
+            #else
+                #error "unimplemented"
+            #endif
+                {
+                    output->swapchainImageFormat = surfaceFormats.data[i];
+                    break;
+                }
         }
     }
 
@@ -707,12 +714,13 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
             },
         },
         .dependencyCount = 1,
-        .pDependencies = &(VkSubpassDependency) {
+        .pDependencies = &(VkSubpassDependency)
+        {
             .srcSubpass = VK_SUBPASS_EXTERNAL,
             .dstSubpass = 0,
             .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask = 0,
             .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = 0,
             .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         },
     }, nil, &output->mainPass));
@@ -974,7 +982,6 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         .clearValueCount = 1,
         .pClearValues = &(VkClearValue){.color = {.float32 = {r, g, b, a}}},
     }, VK_SUBPASS_CONTENTS_INLINE);
-
 
     vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
 
