@@ -38,6 +38,11 @@ typedef struct MZNT_VulkanRenderer
 
     VmaAllocator     vmaAllocator;
 
+    VkRenderPass depthPass;
+    VkRenderPass forwardPass;
+    VkRenderPass finalBlitPass;
+    VkRenderPass uiPass;
+
     MZNT_VulkanShader triangleShader;
 } MZNT_VulkanRenderer;
 

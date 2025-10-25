@@ -3,7 +3,7 @@
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
-#define INLINED_FILE_INCLUSION_NAME k_TriangleShader
+#define INLINED_FILE_INCLUSION_NAME k_DVRPL_Internal_TriangleShader
 #include "Shaders/triangle_spv.c"
 
 VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
@@ -184,6 +184,9 @@ PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(Vk
 
     return queueCreateInfos;
 }
+
+static const VkFormat k_DVRPL_Internal_PreferredColourAttchFormat  = VK_FORMAT_R16G16B16A16_SFLOAT;
+static const VkFormat k_DVRPL_Internal_PreferredDepthAttchFormat   = VK_FORMAT_D32_SFLOAT;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
@@ -376,6 +379,24 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     output->physicalDevice = selectedDevice;
 
+    {
+        VkFormatProperties formatProps = {0};
+        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_DVRPL_Internal_PreferredColourAttchFormat, &formatProps);
+        if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
+        {
+            PNSLR_LogE(PNSLR_StringLiteral("Preferred colour format not supported as color attachment!"), PNSLR_GET_LOC());
+            FORCE_DBG_TRAP;
+        }
+
+        formatProps = (VkFormatProperties) {0};
+        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_DVRPL_Internal_PreferredDepthAttchFormat, &formatProps);
+        if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
+        {
+            PNSLR_LogE(PNSLR_StringLiteral("Preferred depth format not supported as depth attachment!"), PNSLR_GET_LOC());
+            FORCE_DBG_TRAP;
+        }
+    }
+
     VkSurfaceKHR tempSurfaceForQueueSelect = VK_NULL_HANDLE;
     #if PNSLR_WINDOWS
         HWND tempWindow = CreateWindowA("STATIC", "temp", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1, 1, nil, nil, (HINSTANCE) (uintptr_t) config.appHandle.handle, nil);
@@ -456,12 +477,52 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
 
+    // depth-only render pass
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(output->device, &(VkRenderPassCreateInfo)
+        {
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+            .attachmentCount = 1,
+            .pAttachments = &(VkAttachmentDescription)
+            {
+                .format = k_DVRPL_Internal_PreferredDepthAttchFormat,
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .finalLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+            },
+            .subpassCount = 1,
+            .pSubpasses = &(VkSubpassDescription)
+            {
+                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+                .pDepthStencilAttachment = &(VkAttachmentReference)
+                {
+                    .attachment = 0,
+                    .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                },
+            },
+            .dependencyCount = 1,
+            .pDependencies = &(VkSubpassDependency)
+            {
+                .srcSubpass = VK_SUBPASS_EXTERNAL,
+                .dstSubpass = 0,
+                .srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                .dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                .srcAccessMask = 0,
+                .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            },
+        }, nil, &output->depthPass));
+    }
+
     // triangle shader pipeline
     {
         VkShaderModuleCreateInfo triangleShMCi = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = (size_t) k_TriangleShaderSize,
-            .pCode = (u32*) k_TriangleShaderContents,
+            .codeSize = (size_t) k_DVRPL_Internal_TriangleShaderSize,
+            .pCode = (u32*) k_DVRPL_Internal_TriangleShaderContents,
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &triangleShMCi, nil, &output->triangleShader.module));
