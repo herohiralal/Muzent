@@ -309,9 +309,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .flags = 0,
         .pApplicationInfo = &appInfo,
         .enabledLayerCount = enabledLayersCount,
-        .ppEnabledLayerNames = enabledLayers,
+        .ppEnabledLayerNames = (const char* const*) enabledLayers,
         .enabledExtensionCount = enabledExtensionsCount,
-        .ppEnabledExtensionNames = enabledExtensions,
+        .ppEnabledExtensionNames = (const char* const*) enabledExtensions,
     };
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateInstance(&createInfo, nil, &output->instance));
