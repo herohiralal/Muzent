@@ -933,13 +933,14 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandBuffer(cmdBuf->cmdBuffer, 0));
 
-    VkCommandBufferBeginInfo cmdBufBI = {
+    // command buffer start
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkBeginCommandBuffer(cmdBuf->cmdBuffer, &(VkCommandBufferBeginInfo)
+    {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-    };
+    }));
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkBeginCommandBuffer(cmdBuf->cmdBuffer, &cmdBufBI));
-
+    // transition swapchain image to color attachment optimal
     vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
     {
         .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -965,6 +966,7 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         }
     });
 
+    // begin rendering
     vkCmdBeginRendering(cmdBuf->cmdBuffer, &(VkRenderingInfo)
     {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -982,21 +984,25 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         },
     });
 
-    vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
-
-    vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
+    // draw triangle
     {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (f32) surface->swapchainExtent.width,
-        .height = (f32) surface->swapchainExtent.height,
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    });
+        // bind shader
+        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
 
-    vkCmdSetScissor(cmdBuf->cmdBuffer, 0, 1, &(VkRect2D){.offset = {0, 0}, .extent = surface->swapchainExtent});
+        // set viewport
+        vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
+        {
+            .x        = 0.0f,                                    .y        = 0.0f,
+            .width    = (f32) surface->swapchainExtent.width,    .height   = (f32) surface->swapchainExtent.height,
+            .minDepth = 0.0f,                                    .maxDepth = 1.0f,
+        });
 
-    vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
+        // set scissor
+        vkCmdSetScissor(cmdBuf->cmdBuffer, 0, 1, &(VkRect2D){.offset = {0, 0}, .extent = surface->swapchainExtent});
+
+        // draw
+        vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
+    }
 
     return cmdBuf;
 }
@@ -1005,8 +1011,10 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
 {
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
 
+    // finish rendering
     vkCmdEndRendering(cmdBuf->cmdBuffer);
 
+    // transition swapchain image to present
     vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
     {
         .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1032,22 +1040,48 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         }
     });
 
+    // command buffer over
     MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
 
-    VkSubmitInfo submitInfo = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &(surface->presentCompleteSemaphores.data[surface->semIdx]),
-        .pWaitDstStageMask = (VkPipelineStageFlags[]) {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
-        .commandBufferCount = 1,
-        .pCommandBuffers = &(cmdBuf->cmdBuffer),
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &(surface->renderFinishedSemaphores.data[surface->curSwpchImgIdx]),
-    };
+    // submit command buffer
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit2(surface->renderer->gfxQueue, 1, &(VkSubmitInfo2)
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nil,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos    = (VkSemaphoreSubmitInfo[])
+        {
+            {
+                .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = surface->presentCompleteSemaphores.data[surface->semIdx],
+                .value     = 1,
+                .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            },
+        },
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos    = (VkCommandBufferSubmitInfo[])
+        {
+            {
+                .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .commandBuffer = cmdBuf->cmdBuffer,
+            },
+        },
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos    = (VkSemaphoreSubmitInfo[])
+        {
+            {
+                .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = surface->renderFinishedSemaphores.data[surface->curSwpchImgIdx],
+                .value     = 1,
+                .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            },
+        },
+    }, surface->inFlightFences.data[surface->curFrame]));
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit(surface->renderer->gfxQueue, 1, &submitInfo, surface->inFlightFences.data[surface->curFrame]));
-
-    VkPresentInfoKHR presentInfo = {
+    // present
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueuePresentKHR(surface->renderer->gfxQueue, &(VkPresentInfoKHR)
+    {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext = nil,
         .waitSemaphoreCount = 1,
@@ -1056,13 +1090,13 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         .pSwapchains = &(surface->swapchain),
         .pImageIndices = &(surface->curSwpchImgIdx),
         .pResults = nil,
-    };
+    }));
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueuePresentKHR(surface->renderer->gfxQueue, &presentInfo));
-
+    // update swapchain indexing
     surface->semIdx = (surface->semIdx + 1) % (u32) surface->presentCompleteSemaphores.count;
     surface->curFrame = (surface->curFrame + 1) % MZNT_NUM_FRAMES_IN_FLIGHT;
     surface->curSwpchImgIdx = U32_MAX; // invalidate
+
     return true;
 }
 
