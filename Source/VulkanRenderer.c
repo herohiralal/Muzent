@@ -378,9 +378,12 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             selectedDevice = devices.data[i];
             break;
         }
+    }
 
-        if (selectedDevice == VK_NULL_HANDLE)
-            selectedDevice = devices.data[i];
+    if (selectedDevice == VK_NULL_HANDLE)
+    {
+        PNSLR_LogE(PNSLR_StringLiteral("Failed to find suitable physical device!"), PNSLR_GET_LOC());
+        FORCE_DBG_TRAP;
     }
 
     output->physicalDevice = selectedDevice;
