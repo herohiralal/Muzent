@@ -291,30 +291,26 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         }
     }
 
-    VkApplicationInfo appInfo =
-    {
-        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext = nil,
-        .pApplicationName = PNSLR_CStringFromString(config.appName, tempAllocator),
-        .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pEngineName = "M_U_Z_E_N_T",
-        .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_1, // i'd really like to dyna-render, but alas
-    };
-
-    VkInstanceCreateInfo createInfo =
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateInstance(&(VkInstanceCreateInfo)
     {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = nil,
         .flags = 0,
-        .pApplicationInfo = &appInfo,
+        .pApplicationInfo = &(VkApplicationInfo)
+        {
+            .sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pNext              = nil,
+            .pApplicationName   = PNSLR_CStringFromString(config.appName, tempAllocator),
+            .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+            .pEngineName        = "M_U_Z_E_N_T",
+            .engineVersion      = VK_MAKE_VERSION(1, 0, 0),
+            .apiVersion         = VK_API_VERSION_1_3, // fuck it, we dyna-rendering fr this time
+        },
         .enabledLayerCount = enabledLayersCount,
         .ppEnabledLayerNames = (const char* const*) enabledLayers,
         .enabledExtensionCount = enabledExtensionsCount,
         .ppEnabledExtensionNames = (const char* const*) enabledExtensions,
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateInstance(&createInfo, nil, &output->instance));
+    }, nil, &output->instance));
 
     volkLoadInstanceOnly(output->instance);
 
@@ -347,7 +343,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
     for (i64 i = 0; i < devices.count; i++)
     {
-        VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
+        VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+        VkPhysicalDeviceVulkan12Features deviceFeatures12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &deviceFeatures13};
+        VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, .pNext = &deviceFeatures12};
         VkPhysicalDeviceFeatures2 deviceFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &deviceFeatures11};
         vkGetPhysicalDeviceFeatures2(devices.data[i], &deviceFeatures);
 
@@ -355,11 +353,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
 
         PNSLR_LogIf(
-            PNSLR_StringLiteral("Device: $. ty: $. shaddp: $."),
+            PNSLR_StringLiteral("Device: $. ty: $. shaddp: $. bda: $. descidx: $. dyren: $. sync2: $."),
             PNSLR_FmtArgs(
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
                 PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
-                PNSLR_FmtB8(!!deviceFeatures11.shaderDrawParameters)
+                PNSLR_FmtB8(!!deviceFeatures11.shaderDrawParameters),
+                PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
+                PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing),
+                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering),
+                PNSLR_FmtB8(!!deviceFeatures13.synchronization2)
             ),
             PNSLR_GET_LOC()
         );
@@ -367,7 +369,11 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         // prefer discrete gpu on desktop
         // want shader draw params
         if ((!PNSLR_DESKTOP || deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) &&
-            deviceFeatures11.shaderDrawParameters)
+            !!deviceFeatures11.shaderDrawParameters &&
+            !!deviceFeatures12.bufferDeviceAddress &&
+            !!deviceFeatures12.descriptorIndexing &&
+            !!deviceFeatures13.dynamicRendering &&
+            !!deviceFeatures13.synchronization2)
         {
             selectedDevice = devices.data[i];
             break;
@@ -435,32 +441,50 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     const char* enabledDeviceExtensions[] =
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_SPIRV_1_4_EXTENSION_NAME,
     };
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
 
-    VkPhysicalDeviceShaderDrawParametersFeatures shaderDrawParamsFeatures = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
-        .shaderDrawParameters = VK_TRUE,
-    };
-
     VkDeviceCreateInfo deviceCreateInfo =
     {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext = &shaderDrawParamsFeatures,
-        .queueCreateInfoCount = (u32) qcis.count,
-        .pQueueCreateInfos = qcis.data,
-        .enabledExtensionCount = enabledDeviceExtensionCount,
-        .ppEnabledExtensionNames = enabledDeviceExtensions,
-        .pEnabledFeatures = nil,
+        .sType                    = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .queueCreateInfoCount     = (u32) qcis.count,
+        .pQueueCreateInfos        = qcis.data,
+        .enabledExtensionCount    = enabledDeviceExtensionCount,
+        .ppEnabledExtensionNames  = enabledDeviceExtensions,
+        .pEnabledFeatures         = nil,
+        .pNext                    =
+        &(VkPhysicalDeviceShaderDrawParametersFeatures)
+        {
+            .sType                = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
+            .shaderDrawParameters = VK_TRUE,
+            .pNext                =
+            &(VkPhysicalDeviceDynamicRenderingFeatures)
+            {
+                .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+                .dynamicRendering = VK_TRUE,
+            },
+        },
     };
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDevice(selectedDevice, &deviceCreateInfo, nil, &output->device));
 
     volkLoadDevice(output->device);
 
-    vkGetDeviceQueue(output->device, output->gfxQueueFamilyIndex, 0, &output->gfxQueue);
-    vkGetDeviceQueue(output->device, output->presQueueFamilyIndex, 0, &output->presQueue);
+    vkGetDeviceQueue2(output->device, &(VkDeviceQueueInfo2)
+    {
+        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
+        .queueFamilyIndex = output->gfxQueueFamilyIndex,
+        .queueIndex       = 0,
+    },  &output->gfxQueue);
+
+    vkGetDeviceQueue2(output->device, &(VkDeviceQueueInfo2)
+    {
+        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
+        .queueFamilyIndex = output->presQueueFamilyIndex,
+        .queueIndex       = 0,
+    }, &output->presQueue);
 
     VmaVulkanFunctions vmaFns = {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
@@ -476,46 +500,6 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     };
 
     vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
-
-    // depth-only render pass
-    {
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(output->device, &(VkRenderPassCreateInfo)
-        {
-            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-            .attachmentCount = 1,
-            .pAttachments = &(VkAttachmentDescription)
-            {
-                .format = k_DVRPL_Internal_PreferredDepthAttchFormat,
-                .samples = VK_SAMPLE_COUNT_1_BIT,
-                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE,
-                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .finalLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-            },
-            .subpassCount = 1,
-            .pSubpasses = &(VkSubpassDescription)
-            {
-                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                .pDepthStencilAttachment = &(VkAttachmentReference)
-                {
-                    .attachment = 0,
-                    .layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                },
-            },
-            .dependencyCount = 1,
-            .pDependencies = &(VkSubpassDependency)
-            {
-                .srcSubpass = VK_SUBPASS_EXTERNAL,
-                .dstSubpass = 0,
-                .srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                .dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                .srcAccessMask = 0,
-                .dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            },
-        }, nil, &output->depthPass));
-    }
 
     // triangle shader pipeline
     {
@@ -978,6 +962,44 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
 
     return true;
+}
+
+void MZNT_Internal_TransitionVkImage(
+    VkCommandBuffer cmd,
+    VkImage image,
+    VkImageLayout srcLayout,
+    VkImageLayout dstLayout,
+    VkAccessFlags srcAccess,
+    VkAccessFlags dstAccess,
+    VkPipelineStageFlags srcStage,
+    VkPipelineStageFlags dstStage
+)
+{
+    VkImageMemoryBarrier imageBarrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nil,
+        .srcAccessMask = srcAccess,
+        .dstAccessMask = dstAccess,
+        .oldLayout = srcLayout,
+        .newLayout = dstLayout,
+        .subresourceRange = {
+            .aspectMask = (dstLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount = VK_REMAINING_ARRAY_LAYERS,
+        },
+        .image = image,
+    };
+
+    vkCmdPipelineBarrier(
+        cmd,
+        srcStage, dstStage,
+        0,
+        0, nil,
+        0, nil,
+        1, &imageBarrier
+    );
 }
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
