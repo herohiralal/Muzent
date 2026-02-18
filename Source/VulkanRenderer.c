@@ -353,15 +353,31 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
 
         PNSLR_LogIf(
-            PNSLR_StringLiteral("Device: $. ty: $. shaddp: $. bda: $. descidx: $. dyren: $. sync2: $."),
+            PNSLR_StringLiteral(
+                "Device: $. ty: $.\n"
+                "\tsampler anisotropy:                              $.\n" // 1.0
+                "\tshader draw parameters:                          $.\n" // 1.1
+                "\tdescriptor indexing:                             $.\n" // 1.2
+                "\tshader sampled image array non uniform indexing: $.\n"
+                "\tdescriptor binding variable descriptor count:    $.\n"
+                "\truntime descriptor array:                        $.\n"
+                "\tbuffer device address:                           $.\n"
+                "\tsynchronization 2:                               $.\n" // 1.3
+                "\tdynamic rendering:                               $.\n"
+            ),
             PNSLR_FmtArgs(
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
                 PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
+
+                PNSLR_FmtB8(!!deviceFeatures.features.samplerAnisotropy),
                 PNSLR_FmtB8(!!deviceFeatures11.shaderDrawParameters),
-                PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
                 PNSLR_FmtB8(!!deviceFeatures12.descriptorIndexing),
-                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering),
-                PNSLR_FmtB8(!!deviceFeatures13.synchronization2)
+                PNSLR_FmtB8(!!deviceFeatures12.shaderSampledImageArrayNonUniformIndexing),
+                PNSLR_FmtB8(!!deviceFeatures12.descriptorBindingVariableDescriptorCount),
+                PNSLR_FmtB8(!!deviceFeatures12.runtimeDescriptorArray),
+                PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
+                PNSLR_FmtB8(!!deviceFeatures13.synchronization2),
+                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering)
             ),
             PNSLR_GET_LOC()
         );
@@ -369,11 +385,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         // prefer discrete gpu on desktop
         // want shader draw params
         if ((!PNSLR_DESKTOP || deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) &&
+            !!deviceFeatures.features.samplerAnisotropy &&
             !!deviceFeatures11.shaderDrawParameters &&
-            !!deviceFeatures12.bufferDeviceAddress &&
             !!deviceFeatures12.descriptorIndexing &&
-            !!deviceFeatures13.dynamicRendering &&
-            !!deviceFeatures13.synchronization2)
+            !!deviceFeatures12.shaderSampledImageArrayNonUniformIndexing &&
+            !!deviceFeatures12.descriptorBindingVariableDescriptorCount &&
+            !!deviceFeatures12.runtimeDescriptorArray &&
+            !!deviceFeatures12.bufferDeviceAddress &&
+            !!deviceFeatures13.synchronization2 &&
+            !!deviceFeatures13.dynamicRendering)
         {
             selectedDevice = devices.data[i];
             break;
@@ -456,24 +476,31 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .pQueueCreateInfos       = qcis.data,
         .enabledExtensionCount   = enabledDeviceExtensionCount,
         .ppEnabledExtensionNames = enabledDeviceExtensions,
-        .pEnabledFeatures        = nil,
-        .pNext                   =
-        &(VkPhysicalDeviceShaderDrawParametersFeatures)
+        .pEnabledFeatures        = &(VkPhysicalDeviceFeatures)
         {
-            .sType                = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
-            .shaderDrawParameters = VK_TRUE,
-            .pNext                =
-            &(VkPhysicalDeviceDynamicRenderingFeatures)
+            .samplerAnisotropy   = VK_TRUE,
+        },
+        .pNext                   = &(VkPhysicalDeviceVulkan13Features)
+        {
+            .sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+            .pNext               = &(VkPhysicalDeviceVulkan12Features)
             {
-                .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
-                .dynamicRendering = VK_TRUE,
-                .pNext            =
-                &(VkPhysicalDeviceSynchronization2Features)
+                .sType           = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+                .pNext           = &(VkPhysicalDeviceVulkan11Features)
                 {
-                    .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
-                    .synchronization2 = VK_TRUE,
+                    .sType       = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+                    .pNext       = nil,
+
+                    .shaderDrawParameters                  = VK_TRUE,
                 },
+                .descriptorIndexing                        = VK_TRUE,
+                .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+                .descriptorBindingVariableDescriptorCount  = VK_TRUE,
+                .runtimeDescriptorArray                    = VK_TRUE,
+                .bufferDeviceAddress                       = VK_TRUE,
             },
+            .synchronization2                              = VK_TRUE,
+            .dynamicRendering                              = VK_TRUE,
         },
     }, nil, &output->device));
 
