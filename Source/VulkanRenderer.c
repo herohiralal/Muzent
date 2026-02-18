@@ -446,15 +446,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
 
-    VkDeviceCreateInfo deviceCreateInfo =
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDevice(selectedDevice, &(VkDeviceCreateInfo)
     {
-        .sType                    = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .queueCreateInfoCount     = (u32) qcis.count,
-        .pQueueCreateInfos        = qcis.data,
-        .enabledExtensionCount    = enabledDeviceExtensionCount,
-        .ppEnabledExtensionNames  = enabledDeviceExtensions,
-        .pEnabledFeatures         = nil,
-        .pNext                    =
+        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .queueCreateInfoCount    = (u32) qcis.count,
+        .pQueueCreateInfos       = qcis.data,
+        .enabledExtensionCount   = enabledDeviceExtensionCount,
+        .ppEnabledExtensionNames = enabledDeviceExtensions,
+        .pEnabledFeatures        = nil,
+        .pNext                   =
         &(VkPhysicalDeviceShaderDrawParametersFeatures)
         {
             .sType                = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
@@ -464,11 +464,15 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             {
                 .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
                 .dynamicRendering = VK_TRUE,
+                .pNext            =
+                &(VkPhysicalDeviceSynchronization2Features)
+                {
+                    .sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+                    .synchronization2 = VK_TRUE,
+                },
             },
         },
-    };
-
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDevice(selectedDevice, &deviceCreateInfo, nil, &output->device));
+    }, nil, &output->device));
 
     volkLoadDevice(output->device);
 
@@ -653,24 +657,6 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
             }, nil, &(surface->swapchainImageViews.data[i])));
         }
     }
-
-    {
-        surface->swapchainFramebuffers = PNSLR_MakeSlice(VkFramebuffer, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
-        for (i64 i = 0; i < surface->swapchainImages.count; i++)
-        {
-            VkFramebufferCreateInfo fbi = {
-                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass = surface->mainPass,
-                .attachmentCount = 1,
-                .pAttachments = &surface->swapchainImageViews.data[i],
-                .width = surface->swapchainExtent.width,
-                .height = surface->swapchainExtent.height,
-                .layers = 1,
-            };
-
-            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFramebuffer(surface->renderer->device, &fbi, nil, &surface->swapchainFramebuffers.data[i]));
-        }
-    }
 }
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
@@ -735,41 +721,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         }
     }
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateRenderPass(renderer->device, &(VkRenderPassCreateInfo)
-    {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &(VkAttachmentDescription) {
-            .format = output->swapchainImageFormat.format,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        },
-        .subpassCount = 1,
-        .pSubpasses = &(VkSubpassDescription) {
-            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &(VkAttachmentReference) {
-                .attachment = 0,
-                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            },
-        },
-        .dependencyCount = 1,
-        .pDependencies = &(VkSubpassDependency)
-        {
-            .srcSubpass = VK_SUBPASS_EXTERNAL,
-            .dstSubpass = 0,
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask = 0,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        },
-    }, nil, &output->mainPass));
-
     MZNT_Internal_CreateVkSwapchain(output, tempAllocator);
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
@@ -832,62 +783,76 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
             },
         };
 
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
-        VkPipelineViewportStateCreateInfo viewportState = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, .viewportCount = 1, .scissorCount = 1};
-
-        VkPipelineRasterizationStateCreateInfo rasterizer = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-            .depthClampEnable = VK_FALSE,
-            .rasterizerDiscardEnable = VK_FALSE,
-            .polygonMode = VK_POLYGON_MODE_FILL,
-            .cullMode = VK_CULL_MODE_BACK_BIT,
-            .frontFace = VK_FRONT_FACE_CLOCKWISE,
-            .depthBiasEnable = VK_FALSE,
-            .depthBiasSlopeFactor = 1.0f,
-            .lineWidth = 1.0f,
-        };
-
-        VkPipelineMultisampleStateCreateInfo multisampling = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT};
-        VkPipelineColorBlendAttachmentState colorBlendAttachment = {.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT};
-        VkPipelineColorBlendStateCreateInfo colorBlending = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-            .logicOpEnable = VK_FALSE,
-            .logicOp = VK_LOGIC_OP_COPY,
-            .attachmentCount = 1,
-            .pAttachments = &colorBlendAttachment,
-        };
-
         VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-        VkPipelineDynamicStateCreateInfo dynamicState = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-            .dynamicStateCount = sizeof(dynamicStates) / sizeof(VkDynamicState),
-            .pDynamicStates = dynamicStates,
-        };
 
-        VkPipelineRenderingCreateInfo renderingCreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &output->swapchainImageFormat.format,
-        };
-
-        VkGraphicsPipelineCreateInfo pipelineInfo = {
-            .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .pNext = &renderingCreateInfo,
-            .stageCount = sizeof(triangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
-            .pStages = triangleShaderStages,
-            .pVertexInputState = &vertexInputInfo,
-            .pInputAssemblyState = &inputAssembly,
-            .pViewportState = &viewportState,
-            .pRasterizationState = &rasterizer,
-            .pMultisampleState = &multisampling,
-            .pColorBlendState = &colorBlending,
-            .pDynamicState = &dynamicState,
-            .layout = renderer->triangleShader.layout,
-            .renderPass = output->mainPass,
-        };
-
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &pipelineInfo, nil, &output->trianglePipeline));
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
+        {
+            .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .stageCount                  = sizeof(triangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages                     = triangleShaderStages,
+            .pVertexInputState           = &(VkPipelineVertexInputStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            },
+            .pInputAssemblyState         = &(VkPipelineInputAssemblyStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                .topology                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            },
+            .pViewportState              = &(VkPipelineViewportStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                .viewportCount           = 1,
+                .scissorCount            = 1,
+            },
+            .pRasterizationState         = &(VkPipelineRasterizationStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                .depthClampEnable        = VK_FALSE,
+                .rasterizerDiscardEnable = VK_FALSE,
+                .polygonMode             = VK_POLYGON_MODE_FILL,
+                .cullMode                = VK_CULL_MODE_BACK_BIT,
+                .frontFace               = VK_FRONT_FACE_CLOCKWISE,
+                .depthBiasEnable         = VK_FALSE,
+                .depthBiasSlopeFactor    = 1.0f,
+                .lineWidth               = 1.0f,
+            },
+            .pMultisampleState           = &(VkPipelineMultisampleStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                .rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT,
+            },
+            .pColorBlendState            = &(VkPipelineColorBlendStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                .logicOpEnable           = VK_FALSE,
+                .logicOp                 = VK_LOGIC_OP_COPY,
+                .attachmentCount         = 1,
+                .pAttachments            = &(VkPipelineColorBlendAttachmentState)
+                {
+                    .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT |
+                                           VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT |
+                                           VK_COLOR_COMPONENT_A_BIT,
+                },
+            },
+            .pDynamicState               = &(VkPipelineDynamicStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
+                .pDynamicStates          = dynamicStates,
+            },
+            .layout                      = renderer->triangleShader.layout,
+            .renderPass                  = VK_NULL_HANDLE,
+            .pNext                       = &(VkPipelineRenderingCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .colorAttachmentCount    = 1,
+                .pColorAttachmentFormats = &output->swapchainImageFormat.format,
+                .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
+                .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+            },
+        }, nil, &output->trianglePipeline));
     }
 
     return output;
@@ -923,16 +888,13 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
-        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
     }
 
-    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     vkDestroySwapchainKHR(surface->renderer->device, surface->swapchain, nil);
-    vkDestroyRenderPass(surface->renderer->device, surface->mainPass, nil);
     vkDestroySurfaceKHR(surface->renderer->instance, surface->surface, nil);
 
     PNSLR_Delete(surface, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -949,11 +911,9 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
-        vkDestroyFramebuffer(surface->renderer->device, surface->swapchainFramebuffers.data[i], nil);
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
     }
 
-    PNSLR_FreeSlice(&(surface->swapchainFramebuffers), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(surface->swapchainImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
@@ -962,44 +922,6 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     MZNT_Internal_CreateVkSwapchainImagesAndViews(surface, tempAllocator);
 
     return true;
-}
-
-void MZNT_Internal_TransitionVkImage(
-    VkCommandBuffer cmd,
-    VkImage image,
-    VkImageLayout srcLayout,
-    VkImageLayout dstLayout,
-    VkAccessFlags srcAccess,
-    VkAccessFlags dstAccess,
-    VkPipelineStageFlags srcStage,
-    VkPipelineStageFlags dstStage
-)
-{
-    VkImageMemoryBarrier imageBarrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nil,
-        .srcAccessMask = srcAccess,
-        .dstAccessMask = dstAccess,
-        .oldLayout = srcLayout,
-        .newLayout = dstLayout,
-        .subresourceRange = {
-            .aspectMask = (dstLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = VK_REMAINING_MIP_LEVELS,
-            .baseArrayLayer = 0,
-            .layerCount = VK_REMAINING_ARRAY_LAYERS,
-        },
-        .image = image,
-    };
-
-    vkCmdPipelineBarrier(
-        cmd,
-        srcStage, dstStage,
-        0,
-        0, nil,
-        0, nil,
-        1, &imageBarrier
-    );
 }
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
@@ -1018,15 +940,47 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkBeginCommandBuffer(cmdBuf->cmdBuffer, &cmdBufBI));
 
-    vkCmdBeginRenderPass(cmdBuf->cmdBuffer, &(VkRenderPassBeginInfo)
+    vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
     {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = surface->mainPass,
-        .framebuffer = surface->swapchainFramebuffers.data[surface->curSwpchImgIdx],
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &(VkImageMemoryBarrier2)
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+            .srcAccessMask       = 0,
+            .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
+            .subresourceRange    =
+            {
+                .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel    = 0,
+                .levelCount      = 1,
+                .baseArrayLayer  = 0,
+                .layerCount      = 1,
+            },
+        }
+    });
+
+    vkCmdBeginRendering(cmdBuf->cmdBuffer, &(VkRenderingInfo)
+    {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
         .renderArea = {.offset = {0, 0}, .extent = surface->swapchainExtent},
-        .clearValueCount = 1,
-        .pClearValues = &(VkClearValue){.color = {.float32 = {r, g, b, a}}},
-    }, VK_SUBPASS_CONTENTS_INLINE);
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &(VkRenderingAttachmentInfo)
+        {
+            .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView   = surface->swapchainImageViews.data[surface->curSwpchImgIdx],
+            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+            .clearValue  = {.color = {.float32 = {r, g, b, a}}},
+        },
+    });
 
     vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
 
@@ -1051,7 +1005,32 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
 {
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
 
-    vkCmdEndRenderPass(cmdBuf->cmdBuffer);
+    vkCmdEndRendering(cmdBuf->cmdBuffer);
+
+    vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
+    {
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &(VkImageMemoryBarrier2)
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
+            .dstAccessMask       = 0,
+            .oldLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
+            .subresourceRange    =
+            {
+                .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel    = 0,
+                .levelCount      = 1,
+                .baseArrayLayer  = 0,
+                .layerCount      = 1,
+            },
+        }
+    });
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
 

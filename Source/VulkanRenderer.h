@@ -53,20 +53,17 @@ typedef struct MZNT_VulkanRendererCommandBuffer
 
 typedef struct MZNT_VulkanRendererSurface
 {
-    MZNT_RendererSurface          parent;
-    MZNT_VulkanRenderer*          renderer;
-    VkSurfaceKHR                  surface;
-    VkSwapchainKHR                swapchain;
-    VkExtent2D                    swapchainExtent;
-    VkSurfaceFormatKHR            swapchainImageFormat;
-    PNSLR_ArraySlice(VkImage)     swapchainImages;
-    PNSLR_ArraySlice(VkImageView) swapchainImageViews;
-    PNSLR_ArraySlice(VkFramebuffer) swapchainFramebuffers;
-    VkCommandPool                 cmdPool;
+    MZNT_RendererSurface             parent;
+    MZNT_VulkanRenderer*             renderer;
+    VkSurfaceKHR                     surface;
+    VkSwapchainKHR                   swapchain;
+    VkExtent2D                       swapchainExtent;
+    VkSurfaceFormatKHR               swapchainImageFormat;
+    PNSLR_ArraySlice(VkImage)        swapchainImages;
+    PNSLR_ArraySlice(VkImageView)    swapchainImageViews;
+    VkCommandPool                    cmdPool;
 
-    VkRenderPass mainPass;
-
-    VkPipeline                    trianglePipeline;
+    VkPipeline                       trianglePipeline;
 
     u32                              curFrame;
     u32                              semIdx;
