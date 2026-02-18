@@ -1,6 +1,7 @@
 #define MZNT_IMPLEMENTATION
 #include "RendererPrivate.h"
 
+#if 1
 // macro bs ===================================================================================================================
 
 #define MZNT_RHI_ARG_PASS_STAT(ty, arg, api) arg
@@ -161,6 +162,8 @@
         MZNT_RHI_SWITCH_SIX_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5, ty6, arg6, tyArg6) \
     }
 
+#endif
+
 // fn defs ====================================================================================================================
 
 MZNT_RHI_FN_TWO_ARG(
@@ -219,6 +222,7 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+#if 1
 // macro bs ===================================================================================================================
 
 #undef MZNT_RHI_FN_SIX_ARG
@@ -248,3 +252,5 @@ MZNT_RHI_FN_TWO_ARG(
 #undef MZNT_RHI_ARG_DECL_STAT
 #undef MZNT_RHI_ARG_PASS_DYNA
 #undef MZNT_RHI_ARG_PASS_STAT
+
+#endif
