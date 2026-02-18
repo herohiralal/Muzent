@@ -105,14 +105,14 @@
         MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret) \
     }
 
-#define MZNT_RHI_FN_ONE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1) \
+#define MZNT_RHI_FN_ONE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
         MZNT_RHI_SWITCH_ONE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1) \
     }
 
-#define MZNT_RHI_FN_TWO_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2) \
+#define MZNT_RHI_FN_TWO_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -120,7 +120,7 @@
         MZNT_RHI_SWITCH_TWO_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2) \
     }
 
-#define MZNT_RHI_FN_THREE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3) \
+#define MZNT_RHI_FN_THREE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -129,7 +129,7 @@
         MZNT_RHI_SWITCH_THREE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3) \
     }
 
-#define MZNT_RHI_FN_FOUR_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4) \
+#define MZNT_RHI_FN_FOUR_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -139,7 +139,7 @@
         MZNT_RHI_SWITCH_FOUR_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4) \
     }
 
-#define MZNT_RHI_FN_FIVE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5) \
+#define MZNT_RHI_FN_FIVE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4, MZNT_RHI_ARG_DECL_##tyArg5 (ty5) arg5 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -150,7 +150,7 @@
         MZNT_RHI_SWITCH_FIVE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5) \
     }
 
-#define MZNT_RHI_FN_SIX_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5, ty6, arg6, tyArg6) \
+#define MZNT_RHI_FN_SIX_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5, ty6, arg6, tyArg6) \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4, MZNT_RHI_ARG_DECL_##tyArg5 (ty5) arg5, MZNT_RHI_ARG_DECL_##tyArg6 (ty6) arg6 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -167,58 +167,72 @@
 // fn defs ====================================================================================================================
 
 MZNT_RHI_FN_TWO_ARG(
-    MZNT_Renderer*, DYNA,
-    CreateRenderer, (config.type),
-    MZNT_RendererConfiguration, config, STAT,
-    PNSLR_Allocator, tempAllocator, STAT
+    CreateRenderer,
+    (config.type),
+
+    MZNT_Renderer*,             /* ret */      DYNA,
+    MZNT_RendererConfiguration, config,        STAT,
+    PNSLR_Allocator,            tempAllocator, STAT
 )
 
 MZNT_RHI_FN_TWO_ARG(
-    b8, STAT,
-    DestroyRenderer, (renderer ? renderer->type : 0),
-    Renderer, renderer, DYNA,
+    DestroyRenderer,
+    (renderer ? renderer->type : 0),
+
+    b8,              /* ret */      STAT,
+    Renderer,        renderer,      DYNA,
     PNSLR_Allocator, tempAllocator, STAT
 )
 
 MZNT_RHI_FN_THREE_ARG(
-    MZNT_RendererSurface*, DYNA,
-    CreateRendererSurfaceFromWindow, (renderer ? renderer->type : 0),
-    Renderer, renderer, DYNA,
-    MZNT_WindowHandle, windowHandle, STAT,
-    PNSLR_Allocator, tempAllocator, STAT
+    CreateRendererSurfaceFromWindow,
+    (renderer ? renderer->type : 0),
+
+    MZNT_RendererSurface*, /* ret */      DYNA,
+    Renderer,              renderer,      DYNA,
+    MZNT_WindowHandle,     windowHandle,  STAT,
+    PNSLR_Allocator,       tempAllocator, STAT
 )
 
 MZNT_RHI_FN_TWO_ARG(
-    b8, STAT,
-    DestroyRendererSurface, (surface ? surface->type : 0),
-    RendererSurface, surface, DYNA,
+    DestroyRendererSurface,
+    (surface ? surface->type : 0),
+
+    b8,              /* ret */      STAT,
+    RendererSurface, surface,       DYNA,
     PNSLR_Allocator, tempAllocator, STAT
 )
 
 MZNT_RHI_FN_FOUR_ARG(
-    b8, STAT,
-    ResizeRendererSurface, (surface ? surface->type : 0),
-    RendererSurface, surface, DYNA,
-    u16, width, STAT,
-    u16, height, STAT,
+    ResizeRendererSurface,
+    (surface ? surface->type : 0),
+
+    b8,              /* ret */      STAT,
+    RendererSurface, surface,       DYNA,
+    u16,             width,         STAT,
+    u16,             height,        STAT,
     PNSLR_Allocator, tempAllocator, STAT
 )
 
 MZNT_RHI_FN_SIX_ARG(
-    MZNT_RendererCommandBuffer*, DYNA,
-    BeginFrame, (surface ? surface->type : 0),
-    RendererSurface, surface, DYNA,
-    f32, r, STAT,
-    f32, g, STAT,
-    f32, b, STAT,
-    f32, a, STAT,
-    PNSLR_Allocator, tempAllocator, STAT
+    BeginFrame,
+    (surface ? surface->type : 0),
+
+    MZNT_RendererCommandBuffer*, /* ret */      DYNA,
+    RendererSurface,             surface,       DYNA,
+    f32,                         r,             STAT,
+    f32,                         g,             STAT,
+    f32,                         b,             STAT,
+    f32,                         a,             STAT,
+    PNSLR_Allocator,             tempAllocator, STAT
 )
 
 MZNT_RHI_FN_TWO_ARG(
-    b8, STAT,
-    EndFrame, (surface ? surface->type : 0),
-    RendererSurface, surface, DYNA,
+    EndFrame,
+    (surface ? surface->type : 0),
+
+    b8,              /* ret */      STAT,
+    RendererSurface, surface,       DYNA,
     PNSLR_Allocator, tempAllocator, STAT
 )
 
