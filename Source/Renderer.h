@@ -121,5 +121,73 @@ MZNT_RendererCommandBuffer* MZNT_BeginFrame(MZNT_RendererSurface* surface, f32 r
  */
 b8 MZNT_EndFrame(MZNT_RendererSurface* surface, PNSLR_Allocator tempAllocator);
 
+/**
+ * Represents a mesh that can be drawn.
+ */
+typedef struct MZNT_Mesh
+{
+    MZNT_RendererType type;
+} MZNT_Mesh;
+
+/**
+ * The vertex attributes that can be used in a mesh.
+ */
+ENUM_START(MZNT_VertexAttributeType, u8)
+    #define MZNT_VertexAttributeType_Position  ((MZNT_VertexAttributeType) 0)
+    #define MZNT_VertexAttributeType_Color     ((MZNT_VertexAttributeType) 1)
+    #define MZNT_VertexAttributeType_Normal    ((MZNT_VertexAttributeType) 2)
+    #define MZNT_VertexAttributeType_Tangent   ((MZNT_VertexAttributeType) 3)
+    #define MZNT_VertexAttributeType_TexCoord0 ((MZNT_VertexAttributeType) 4)
+    #define MZNT_VertexAttributeType_TexCoord1 ((MZNT_VertexAttributeType) 5)
+    #define MZNT_VertexAttributeType_TexCoord2 ((MZNT_VertexAttributeType) 6)
+    #define MZNT_VertexAttributeType_TexCoord3 ((MZNT_VertexAttributeType) 7)
+ENUM_END
+
+/**
+ * The vertex attribute description for a mesh, specifying the type and number of components.
+ */
+typedef struct MZNT_VertexAttribute
+{
+    MZNT_VertexAttributeType type;
+    u8                       componentCount;
+} MZNT_VertexAttribute;
+
+PNSLR_DECLARE_ARRAY_SLICE(MZNT_VertexAttribute);
+
+/**
+ * The types of indices that can be used in a mesh.
+ * Note that 32-bit indices aren't always supported on certain platforms.
+ */
+ENUM_START(MZNT_IndexType, u8)
+    #define MZNT_IndexType_U16 ((MZNT_IndexType) 0)
+    #define MZNT_IndexType_U32 ((MZNT_IndexType) 1)
+ENUM_END
+
+/**
+ * The information required to create a mesh, including vertex attributes, vertex/index data, and counts.
+ * The vertex attributes must be provided in the same order as the vertex data layout.
+ */
+typedef struct MZNT_MeshCreateInfo
+{
+    PNSLR_ArraySlice(MZNT_VertexAttribute) vertexAttributes;
+    MZNT_IndexType                         indexType;
+
+    void* vertexData;
+    i64   vertexCount;
+
+    void* indexData;
+    i64   indexCount;
+} MZNT_MeshCreateInfo;
+
+/**
+ * Uploads a mesh to the GPU based on the provided creation information, returning a handle to the uploaded mesh.
+ */
+MZNT_Mesh* MZNT_UploadMesh(MZNT_Renderer* renderer, MZNT_MeshCreateInfo* createInfo, PNSLR_Allocator tempAllocator);
+
+/**
+ * Destroys the given mesh and frees associated resources.
+ */
+b8 MZNT_DestroyMesh(MZNT_Mesh* mesh, PNSLR_Allocator tempAllocator);
+
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================

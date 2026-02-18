@@ -93,5 +93,24 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
 b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
 
+typedef struct MZNT_VulkanMesh
+{
+    MZNT_Mesh             parent;
+    MZNT_VulkanRenderer*  owner;
+
+    VkBuffer      meshBuffer;
+    VmaAllocation meshAllocation;
+
+    MZNT_IndexType idxType;
+
+    u32             vertexCount;
+    u32             indexCount;
+    i64             vertexBufferSize;
+    i64             indexBufferSize;
+} MZNT_VulkanMesh;
+
+MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_MeshCreateInfo* createInfo, PNSLR_Allocator tempAllocator);
+b8 MZNT_DestroyMesh_Vulkan(MZNT_VulkanMesh* mesh, PNSLR_Allocator tempAllocator);
+
 EXTERN_C_END
 #endif

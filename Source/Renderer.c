@@ -236,6 +236,25 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+MZNT_RHI_FN_THREE_ARG(
+    UploadMesh,
+    (renderer ? renderer->type : 0),
+
+    MZNT_Mesh*,           /* ret */      DYNA,
+    Renderer,             renderer,      DYNA,
+    MZNT_MeshCreateInfo*, createInfo,    STAT,
+    PNSLR_Allocator,      tempAllocator, STAT
+)
+
+MZNT_RHI_FN_TWO_ARG(
+    DestroyMesh,
+    (mesh ? mesh->type : 0),
+
+    b8,               /* ret */     STAT,
+    Mesh,             mesh,         DYNA,
+    PNSLR_Allocator, tempAllocator, STAT
+)
+
 #if 1
 // macro bs ===================================================================================================================
 
