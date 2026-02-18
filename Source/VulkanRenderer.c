@@ -186,7 +186,7 @@ PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(Vk
 }
 
 static const VkFormat k_DVRPL_Internal_PreferredColourAttchFormat  = VK_FORMAT_R16G16B16A16_SFLOAT;
-static const VkFormat k_DVRPL_Internal_PreferredDepthAttchFormat   = VK_FORMAT_D32_SFLOAT;
+static const VkFormat k_DVRPL_Internal_PreferredDepthAttchFormat   = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
@@ -611,33 +611,33 @@ void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface, PNSLR_
     surface->swapchainExtent = surfaceCaps.currentExtent;
     PNSLR_LogDf(PNSLR_StringLiteral("Swapchain extent: $x$"), PNSLR_FmtArgs(PNSLR_FmtU32(surface->swapchainExtent.width, 0), PNSLR_FmtU32(surface->swapchainExtent.height, 0)), PNSLR_GET_LOC());
     VkSwapchainCreateInfoKHR swapchainCI = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = surface->surface,
-        .minImageCount = imageCount,
-        .imageFormat = surface->swapchainImageFormat.format,
-        .imageColorSpace = surface->swapchainImageFormat.colorSpace,
-        .imageExtent = surface->swapchainExtent,
+        .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface          = surface->surface,
+        .minImageCount    = imageCount,
+        .imageFormat      = surface->swapchainImageFormat.format,
+        .imageColorSpace  = surface->swapchainImageFormat.colorSpace,
+        .imageExtent      = surface->swapchainExtent,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .preTransform = surfaceCaps.currentTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = selectedPresentMode,
-        .clipped = VK_TRUE,
-        .oldSwapchain = surface->swapchain,
+        .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .preTransform     = surfaceCaps.currentTransform,
+        .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode      = selectedPresentMode,
+        .clipped          = VK_TRUE,
+        .oldSwapchain     = surface->swapchain,
     };
 
     u32 queueFamilyIndices[] = {surface->renderer->gfxQueueFamilyIndex, surface->renderer->presQueueFamilyIndex};
     if (surface->renderer->gfxQueueFamilyIndex != surface->renderer->presQueueFamilyIndex)
     {
-        swapchainCI.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapchainCI.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         swapchainCI.queueFamilyIndexCount = 2;
-        swapchainCI.pQueueFamilyIndices = queueFamilyIndices;
+        swapchainCI.pQueueFamilyIndices   = queueFamilyIndices;
     }
     else
     {
-        swapchainCI.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchainCI.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
         swapchainCI.queueFamilyIndexCount = 0;
-        swapchainCI.pQueueFamilyIndices = nil;
+        swapchainCI.pQueueFamilyIndices   = nil;
     }
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(surface->renderer->device, &swapchainCI, nil, &(surface->swapchain)));
@@ -756,28 +756,27 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
     output->semIdx = 0;
     output->curFrame = 0;
 
-    VkCommandPoolCreateInfo cmdPoolInfo = {
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &(VkCommandPoolCreateInfo)
+    {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = renderer->gfxQueueFamilyIndex,
-    };
+    }, nil, &(output->cmdPool)));
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &cmdPoolInfo, nil, &(output->cmdPool)));
-
-    VkCommandBufferAllocateInfo cmdBufAI = {
+    VkCommandBuffer cmdBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &(VkCommandBufferAllocateInfo)
+    {
         .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool        = output->cmdPool,
         .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = MZNT_NUM_FRAMES_IN_FLIGHT,
-    };
+    }, cmdBuffers));
 
-    VkCommandBuffer cmdBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(renderer->device, &cmdBufAI, cmdBuffers));
     for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         output->commandBuffers[i].parent.type = MZNT_RendererType_Vulkan;
-        output->commandBuffers[i].renderer = renderer;
-        output->commandBuffers[i].cmdBuffer = cmdBuffers[i];
+        output->commandBuffers[i].renderer    = renderer;
+        output->commandBuffers[i].cmdBuffer   = cmdBuffers[i];
     }
 
     i64 imgCount = output->swapchainImages.count;
@@ -793,6 +792,56 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
         VkFenceCreateInfo fenceCI = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
+    }
+
+    // depth image
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateImage(renderer->vmaAllocator, &(VkImageCreateInfo)
+        {
+            .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .imageType     = VK_IMAGE_TYPE_2D,
+            .format        = k_DVRPL_Internal_PreferredDepthAttchFormat,
+            .extent        =
+            {
+                .width     = output->swapchainExtent.width,
+                .height    = output->swapchainExtent.height,
+                .depth     = 1,
+            },
+            .mipLevels     = 1,
+            .arrayLayers   = 1,
+            .samples       = VK_SAMPLE_COUNT_1_BIT,
+            .tiling        = VK_IMAGE_TILING_OPTIMAL,
+            .usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        },
+        &(VmaAllocationCreateInfo)
+        {
+            .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+            .usage = VMA_MEMORY_USAGE_AUTO,
+        }, &(output->depthImage), &(output->depthImageAllocation), nil));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(renderer->device, &(VkImageViewCreateInfo)
+        {
+            .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .image      = output->depthImage,
+            .viewType   = VK_IMAGE_VIEW_TYPE_2D,
+            .format     = k_DVRPL_Internal_PreferredDepthAttchFormat,
+            .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
+                .baseArrayLayer = 0,
+                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+            },
+        }, nil, &output->depthImageView));
     }
 
     {
@@ -894,6 +943,9 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
 
     vkDestroyPipeline(surface->renderer->device, surface->trianglePipeline, nil);
+
+    vmaDestroyImage(surface->renderer->vmaAllocator, surface->depthImage, surface->depthImageAllocation);
+    vkDestroyImageView(surface->renderer->device, surface->depthImageView, nil);
 
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)
