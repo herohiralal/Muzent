@@ -520,20 +520,18 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .queueIndex       = 0,
     }, &output->presQueue);
 
-    VmaVulkanFunctions vmaFns = {
-        .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-        .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
-    };
-
-    VmaAllocatorCreateInfo allocatorInfo = {
-        .physicalDevice = output->physicalDevice,
-        .device = output->device,
-        .instance = output->instance,
-        .flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
-        .pVulkanFunctions = &vmaFns,
-    };
-
-    vmaCreateAllocator(&allocatorInfo, &(output->vmaAllocator));
+    MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateAllocator(&(VmaAllocatorCreateInfo)
+    {
+        .physicalDevice            = output->physicalDevice,
+        .device                    = output->device,
+        .instance                  = output->instance,
+        .flags                     = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
+        .pVulkanFunctions          = &(VmaVulkanFunctions)
+        {
+            .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+            .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
+        },
+    }, &(output->vmaAllocator)));
 
     // triangle shader pipeline
     {
