@@ -1180,6 +1180,8 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
     return true;
 }
 
+// TODO: Set up a staging buffer and do proper GPU upload instead of directly writing to a host visible buffer
+
 MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_MeshCreateInfo* createInfo, PNSLR_Allocator tempAllocator)
 {
     i64 singleVertexSize = 0;
@@ -1234,7 +1236,7 @@ MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_Mesh
     PNSLR_MemCopy((u8*) bufferPtr + vertexBufferSize, createInfo->indexData, indexBufferSize);
     vmaUnmapMemory(renderer->vmaAllocator, output->meshAllocation);
 
-    return nil;
+    return output;
 }
 
 b8 MZNT_DestroyMesh_Vulkan(MZNT_VulkanMesh* mesh, PNSLR_Allocator tempAllocator)
