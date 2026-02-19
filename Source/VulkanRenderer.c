@@ -1210,8 +1210,8 @@ MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_Mesh
     output->parent.type      = MZNT_RendererType_Vulkan;
     output->owner            = renderer;
     output->idxType          = createInfo->indexType;
-    output->vertexCount      = createInfo->vertexCount;
-    output->indexCount       = createInfo->indexCount;
+    output->vertexCount      = (u32) createInfo->vertexCount;
+    output->indexCount       = (u32) createInfo->indexCount;
     output->vertexBufferSize = vertexBufferSize;
     output->indexBufferSize  = indexBufferSize;
 
@@ -1232,8 +1232,8 @@ MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_Mesh
     void* bufferPtr = nil;
     MZNT_INTERNAL_VK_CHECKED_CALL(vmaMapMemory(renderer->vmaAllocator, output->meshAllocation, &bufferPtr));
     if (!bufferPtr) FORCE_DBG_TRAP;
-    PNSLR_MemCopy(bufferPtr, createInfo->vertexData, vertexBufferSize);
-    PNSLR_MemCopy((u8*) bufferPtr + vertexBufferSize, createInfo->indexData, indexBufferSize);
+    PNSLR_MemCopy(      bufferPtr,                    createInfo->vertexData, (i32) vertexBufferSize);
+    PNSLR_MemCopy((u8*) bufferPtr + vertexBufferSize, createInfo->indexData,  (i32) indexBufferSize);
     vmaUnmapMemory(renderer->vmaAllocator, output->meshAllocation);
 
     return output;
@@ -1243,7 +1243,7 @@ b8 MZNT_DestroyMesh_Vulkan(MZNT_VulkanMesh* mesh, PNSLR_Allocator tempAllocator)
 {
     vmaDestroyBuffer(mesh->owner->vmaAllocator, mesh->meshBuffer, mesh->meshAllocation);
     PNSLR_Delete(mesh, mesh->owner->parent.allocator, PNSLR_GET_LOC(), nil);
-    return false;
+    return true;
 }
 
 #endif
