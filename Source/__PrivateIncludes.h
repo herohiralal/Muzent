@@ -1,7 +1,7 @@
 #ifndef MZNT_PRIVATE_INLCUDES_H
 #define MZNT_PRIVATE_INLCUDES_H
 
-#include "Dependencies/Panshilar/Source/__PrivateIncludes.h"
+#include "../../Panshilar/Source/__PrivateIncludes.h"
 
 /*
 This is where we define what all rendering backends Muzent supports.

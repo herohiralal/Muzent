@@ -6,7 +6,7 @@
     #include "__PrivateIncludes.h"
 #endif
 
-#include "Dependencies/Panshilar/Source/Panshilar.h"
+#include "../../Panshilar/Source/Panshilar.h"
 
 //-skipreflect
 #endif // MZNT_ENTRY_H =============================================================

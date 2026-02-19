@@ -5,7 +5,7 @@
 #define MZNT_IMPLEMENTATION
 #include "__Prelude.h"
 
-#include "Dependencies/Panshilar/Source/zzzz_Unity.c"
+#include "../../Panshilar/Source/zzzz_Unity.c"
 
 #include "Renderer.c"
 #include "VulkanRenderer.c"
