@@ -159,6 +159,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             psoDesc.SampleDesc.Count                = 1;
             psoDesc.SampleMask                      = UINT_MAX;
             psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoDesc.RasterizerState.FrontCounterClockwise = true;
             psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
             psoDesc.DepthStencilState.DepthEnable   = false;
             psoDesc.DepthStencilState.StencilEnable = false;
@@ -470,12 +471,13 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
 
     // viewport & scissor
     {
-        D3D12_VIEWPORT vp;
+        D3D12_VIEWPORT vp = { };
         vp.Width  = (float) surface->swapchainWidth;
         vp.Height = (float) surface->swapchainHeight;
+        vp.MaxDepth = 1.0f;
         cmdBuffer.cmdList->RSSetViewports(1, &vp);
 
-        D3D12_RECT scissor;
+        D3D12_RECT scissor = { };
         scissor.right  = (LONG) surface->swapchainWidth;
         scissor.bottom = (LONG) surface->swapchainHeight;
         cmdBuffer.cmdList->RSSetScissorRects(1, &scissor);
