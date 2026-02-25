@@ -146,22 +146,22 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             inputLayout.NumElements        = 0;
 
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
-            psoDesc.pRootSignature                 = output->triangleShader.rootSignature;
-            psoDesc.VS.pShaderBytecode             = k_MZNT_Internal_TriangleShaderVSContents;
-            psoDesc.VS.BytecodeLength              = k_MZNT_Internal_TriangleShaderVSSize;
-            psoDesc.PS.pShaderBytecode             = k_MZNT_Internal_TriangleShaderPSContents;
-            psoDesc.PS.BytecodeLength              = k_MZNT_Internal_TriangleShaderPSSize;
-            psoDesc.InputLayout.pInputElementDescs = inputLayout.pInputElementDescs;
-            psoDesc.InputLayout.NumElements        = inputLayout.NumElements;
-            psoDesc.PrimitiveTopologyType          = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                  = k_MZNT_Internal_PreferredColourAttchFormat;
-            psoDesc.NumRenderTargets               = 1;
-            psoDesc.DSVFormat                      = k_MZNT_Internal_PreferredDepthAttchFormat;
-            psoDesc.SampleDesc.Count               = 1;
-            psoDesc.SampleMask                     = UINT_MAX;
-            psoDesc.RasterizerState                = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoDesc.BlendState                     = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoDesc.DepthStencilState              = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+            psoDesc.pRootSignature                  = output->triangleShader.rootSignature;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_TriangleShaderVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_TriangleShaderVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_TriangleShaderPSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_TriangleShaderPSSize;
+            psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
+            psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
+            psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            psoDesc.RTVFormats[0]                   = DXGI_FORMAT_B8G8R8A8_UNORM;
+            psoDesc.NumRenderTargets                = 1;
+            psoDesc.SampleDesc.Count                = 1;
+            psoDesc.SampleMask                      = UINT_MAX;
+            psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+            psoDesc.DepthStencilState.DepthEnable   = false;
+            psoDesc.DepthStencilState.StencilEnable = false;
 
             MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->triangleShader.pipelineState))));
         }
