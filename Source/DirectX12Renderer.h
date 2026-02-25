@@ -32,43 +32,41 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 typedef struct MZNT_DirectX12RendererCommandBuffer
 {
     MZNT_RendererCommandBuffer parent;
-    MZNT_DirectX12Renderer*       renderer;
-    // VkCommandBuffer            cmdBuffer;
+    MZNT_DirectX12Renderer*    renderer;
+    ID3D12CommandAllocator*    cmdAllocator;
+    ID3D12GraphicsCommandList* cmdList;
 } MZNT_DirectX12RendererCommandBuffer;
 
 typedef struct MZNT_DirectX12RendererSurface
 {
-    MZNT_RendererSurface parent;
-
+    MZNT_RendererSurface    parent;
     MZNT_DirectX12Renderer* renderer; // owning renderer instance
 
-    // main vk objs
-    // VkSurfaceKHR  surface;
-    // VkCommandPool cmdPool;
+    // swapchain
+    IDXGISwapChain4* swapchain;
+    UINT             swapchainWidth, swapchainHeight;
+    DXGI_FORMAT      swapchainFormat;
+    ID3D12Resource*  renderTargets[MZNT_NUM_FRAMES_IN_FLIGHT]; // back buffers from the swapchain
 
-    // depth stuff
-    // VkImage       depthImage;
-    // VmaAllocation depthImageAllocation;
-    // VkImageView   depthImageView;
+    // descriptor heaps
+    ID3D12DescriptorHeap* rtvHeap;
+    UINT                  rtvDescriptorSize;
 
-    // shaders
-    // VkPipeline trianglePipeline;
+    // depth
+    ID3D12Resource*       depthBuffer;
+    ID3D12DescriptorHeap* dsvHeap;
 
-    // swapchain and related
-    // VkSwapchainKHR                swapchain;
-    // VkExtent2D                    swapchainExtent;
-    // VkSurfaceFormatKHR            swapchainImageFormat;
-    // PNSLR_ArraySlice(VkImage)     swapchainImages;
-    // PNSLR_ArraySlice(VkImageView) swapchainImageViews;
+    // pipeline
+    ID3D12PipelineState*  trianglePipeline;
+
+    // command buffers (frames in flight)
+    MZNT_DirectX12RendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
 
     // synchronization
-    u32                              curFrame;
-    u32                              semIdx;
-    u32                              curSwpchImgIdx;
-    MZNT_DirectX12RendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
-    // PNSLR_ArraySlice(VkSemaphore)    presentCompleteSemaphores;
-    // PNSLR_ArraySlice(VkSemaphore)    renderFinishedSemaphores;
-    // PNSLR_ArraySlice(VkFence)        inFlightFences;
+    UINT         curFrame;
+    ID3D12Fence* fence;
+    UINT64       fenceValue;
+    HANDLE       fenceEvent;
 } MZNT_DirectX12RendererSurface;
 
 MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);

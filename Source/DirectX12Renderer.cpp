@@ -46,8 +46,8 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
 #define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
     MZNT_Internal_LogDx12ResultOnFailure((call), Panshilar::StringLiteral(#call), PNSLR_GET_LOC())
 
-static const DXGI_FORMAT k_DVRPL_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
-static const DXGI_FORMAT k_DVRPL_Internal_PreferredDepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+static const DXGI_FORMAT k_MZNT_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
+static const DXGI_FORMAT k_MZNT_Internal_PreferredDepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
@@ -151,9 +151,9 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             psoDesc.InputLayout.pInputElementDescs = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements        = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType          = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                  = k_DVRPL_Internal_PreferredColourAttchFormat;
+            psoDesc.RTVFormats[0]                  = k_MZNT_Internal_PreferredColourAttchFormat;
             psoDesc.NumRenderTargets               = 1;
-            psoDesc.DSVFormat                      = k_DVRPL_Internal_PreferredDepthAttchFormat;
+            psoDesc.DSVFormat                      = k_MZNT_Internal_PreferredDepthAttchFormat;
             psoDesc.SampleDesc.Count               = 1;
             psoDesc.SampleMask                     = UINT_MAX;
             psoDesc.RasterizerState                = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -208,6 +208,20 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     return true;
 }
 
+void MZNT_Internal_WaitForDx12GPUToBeIdle(MZNT_DirectX12RendererSurface* surface)
+{
+    UINT64 oldFenceValue = surface->fenceValue;
+    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, surface->fenceValue));
+    surface->fenceValue++;
+    if (surface->fence->GetCompletedValue() < oldFenceValue)
+    {
+        MZNT_INTERNAL_DX12_CHECKED_CALL(surface->fence->SetEventOnCompletion(oldFenceValue, surface->fenceEvent));
+        WaitForSingleObject(surface->fenceEvent, INFINITE);
+    }
+
+    surface->curFrame = surface->swapchain->GetCurrentBackBufferIndex();
+}
+
 MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
 {
     MZNT_DirectX12RendererSurface* output = PNSLR_New(MZNT_DirectX12RendererSurface, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
@@ -216,11 +230,154 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
     output->parent.type = MZNT_RendererType_DirectX12;
     output->renderer    = renderer;
 
+    // swapchain & its properties
+    {
+        output->swapchainFormat = DXGI_FORMAT_B8G8R8A8_UNORM; // this is the most widely supported swapchain format, even though we render to a different format internally
+
+        DXGI_SWAP_CHAIN_DESC1 swapchainDesc = { };
+        swapchainDesc.Width            = 0; // use window's client area width
+        swapchainDesc.Height           = 0; // use window's client area height
+        swapchainDesc.Format           = output->swapchainFormat;
+        swapchainDesc.Stereo           = FALSE;
+        swapchainDesc.SampleDesc.Count = 1;
+        swapchainDesc.BufferUsage      = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapchainDesc.BufferCount      = MZNT_NUM_FRAMES_IN_FLIGHT;
+        swapchainDesc.Scaling          = DXGI_SCALING_NONE;
+        swapchainDesc.SwapEffect       = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapchainDesc.AlphaMode        = DXGI_ALPHA_MODE_UNSPECIFIED;
+
+        HWND wnd;
+        #if PNSLR_WINDOWS
+        {
+            wnd = (HWND) (uintptr_t) windowHandle.handle;
+        }
+        #else
+            #error "Unsupported platform"
+        #endif
+
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->dxgiFactory->CreateSwapChainForHwnd(renderer->cmdQueue, wnd, &swapchainDesc, nil, nil, (IDXGISwapChain1**) &(output->swapchain)));
+
+        output->swapchain->GetDesc1(&swapchainDesc);
+        output->swapchainWidth  = swapchainDesc.Width;
+        output->swapchainHeight = swapchainDesc.Height;
+    }
+
+    // descriptor heap & its size
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
+        heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+        heapDesc.NumDescriptors = MZNT_NUM_FRAMES_IN_FLIGHT;
+        heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&(output->rtvHeap))));
+
+        output->rtvDescriptorSize = renderer->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
+    // render target views
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = output->rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+        {
+            ID3D12Resource* backBuffer;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(output->swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+            renderer->device->CreateRenderTargetView(backBuffer, nil, rtvHandle);
+            rtvHandle.ptr += output->rtvDescriptorSize;
+
+            output->renderTargets[i] = backBuffer;
+        }
+    }
+
+    // depth stencil buffer
+    {
+        D3D12_RESOURCE_DESC depthDesc = { };
+        depthDesc.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        depthDesc.Width            = output->swapchainWidth;
+        depthDesc.Height           = output->swapchainHeight;
+        depthDesc.DepthOrArraySize = 1;
+        depthDesc.MipLevels        = 1;
+        depthDesc.Format           = k_MZNT_Internal_PreferredDepthAttchFormat;
+        depthDesc.SampleDesc.Count = 1;
+        depthDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+        D3D12_CLEAR_VALUE depthOptimizedClearValue = { };
+        depthOptimizedClearValue.Format             = k_MZNT_Internal_PreferredDepthAttchFormat;
+        depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &depthDesc,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+            &depthOptimizedClearValue,
+            IID_PPV_ARGS(&(output->depthBuffer))
+        ));
+    }
+
+    // dsv heap
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = { };
+        dsvHeapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+        dsvHeapDesc.NumDescriptors = 1;
+        dsvHeapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&(output->dsvHeap))));
+        renderer->device->CreateDepthStencilView(output->depthBuffer, nil, output->dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    }
+
+    // command allocators & command lists
+    for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+    {
+        MZNT_DirectX12RendererCommandBuffer& cmdBuffer = output->commandBuffers[i];
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&(cmdBuffer.cmdAllocator))));
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, cmdBuffer.cmdAllocator, nil, IID_PPV_ARGS(&(cmdBuffer.cmdList))));
+
+        // it starts in the recording state...
+        cmdBuffer.cmdList->Close();
+    }
+
+    // fence, fence value, fence event
+    MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateFence(output->fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&(output->fence))));
+    output->fenceValue++;
+    output->fenceEvent = CreateEventA(nil, FALSE, FALSE, nil);
+    if (!output->fenceEvent) FORCE_DBG_TRAP;
+
+    // frame idx
+    output->curFrame = output->swapchain->GetCurrentBackBufferIndex();
+
     return output;
 }
 
 b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocator tempAllocator)
 {
+    if (!surface) return false;
+
+    MZNT_Internal_WaitForDx12GPUToBeIdle(surface);
+
+    // destroy command allocators & command lists
+    for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+    {
+        MZNT_DirectX12RendererCommandBuffer& cmdBuffer = surface->commandBuffers[i];
+        cmdBuffer.cmdList->Release();
+        cmdBuffer.cmdAllocator->Release();
+    }
+
+    // fences and events
+    CloseHandle(surface->fenceEvent);
+    surface->fence->Release();
+
+    // depth stencil buffer and its view
+    surface->dsvHeap->Release();
+    surface->depthBuffer->Release();
+
+    // render target views and swapchain buffers
+    for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+        surface->renderTargets[i]->Release();
+
+    // rtv heap
+    surface->rtvHeap->Release();
+
+    // swapchain
+    surface->swapchain->Release();
+
     PNSLR_Delete(surface, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     return true;
@@ -228,7 +385,42 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
 
 b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator)
 {
-    return false;
+    // TODO: resize depth image as well
+    if (!surface) return false;
+    if (!surface->renderer) FORCE_DBG_TRAP;
+
+    MZNT_Internal_WaitForDx12GPUToBeIdle(surface);
+
+    // release render target views
+    for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+        surface->renderTargets[i]->Release();
+
+    // resize buffers
+    surface->swapchain->ResizeBuffers(MZNT_NUM_FRAMES_IN_FLIGHT, width, height, surface->swapchainFormat, 0);
+
+    // update height/width
+    {
+        DXGI_SWAP_CHAIN_DESC1 swapchainDesc;
+        surface->swapchain->GetDesc1(&swapchainDesc);
+        surface->swapchainWidth  = swapchainDesc.Width;
+        surface->swapchainHeight = swapchainDesc.Height;
+    }
+
+    // render target views
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = surface->rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+        {
+            ID3D12Resource* backBuffer;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(surface->swapchain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+            surface->renderer->device->CreateRenderTargetView(backBuffer, nil, rtvHandle);
+            rtvHandle.ptr += surface->rtvDescriptorSize;
+
+            surface->renderTargets[i] = backBuffer;
+        }
+    }
+
+    return true;
 }
 
 MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
