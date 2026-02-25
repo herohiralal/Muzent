@@ -7,8 +7,6 @@ EXTERN_C_BEGIN
 
 typedef struct MZNT_DirectX12Shader
 {
-    ID3DBlob*            vsBlob;
-    ID3DBlob*            psBlob;
     ID3D12RootSignature* rootSignature;
     ID3D12PipelineState* pipelineState;
 } MZNT_DirectX12Shader;

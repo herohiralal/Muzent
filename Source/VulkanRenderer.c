@@ -2,8 +2,9 @@
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
-#define INLINED_FILE_INCLUSION_NAME k_DVRPL_Internal_TriangleShader
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_TriangleShader
 #include "Shaders/triangle_spv.c"
+#undef INLINED_FILE_INCLUSION_NAME
 
 VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -536,8 +537,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     {
         VkShaderModuleCreateInfo triangleShMCi = {
             .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = (size_t) k_DVRPL_Internal_TriangleShaderSize,
-            .pCode = (u32*) k_DVRPL_Internal_TriangleShaderContents,
+            .codeSize = (size_t) k_MZNT_Internal_TriangleShaderSize,
+            .pCode = (u32*) k_MZNT_Internal_TriangleShaderContents,
         };
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &triangleShMCi, nil, &output->triangleShader.module));
