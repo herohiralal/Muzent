@@ -1,5 +1,5 @@
 #define MZNT_IMPLEMENTATION
-#include "RendererPrivate.h"
+#include "RendererPrivate.hpp"
 
 #if 1
 // macro bs ===================================================================================================================
@@ -18,12 +18,12 @@
 
 #define MZNT_RHI_ARG_CHECK_STAT(tyQ, arg) /*nothing*/
 #if PNSLR_DBG
-    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) { PNSLR_LogE(PNSLR_StringLiteral("Arg mismatch: " #arg " doesn't match " #tyQ "."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; } } while (0)
+    #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) do { if (arg->type != tyQ) { PNSLR_LogE(Panshilar::StringLiteral("Arg mismatch: " #arg " doesn't match " #tyQ "."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; } } while (0)
 #else
     #define MZNT_RHI_ARG_CHECK_DYNA(tyQ, arg) /*nothing*/
 #endif
 
-#define MZNT_RHI_FN_NULL_BRANCH(ret)                case MZNT_RendererType_Null:     return (ret) {0};
+#define MZNT_RHI_FN_NULL_BRANCH(ret)                case MZNT_RendererType_Null:     return { };
 
 #if MZNT_VULKAN
     #define MZNT_RHI_FN_VK_BRANCH(tyRet, fn, ...)   case MZNT_RendererType_Vulkan:   return MZNT_RHI_RET_START_##tyRet MZNT_##fn##_Vulkan     ( __VA_ARGS__ ) MZNT_RHI_RET_END_##tyRet;
@@ -43,7 +43,7 @@
     #define MZNT_RHI_FN_METAL_BRANCH(tyRet, fn, ...)
 #endif
 
-#define MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret)          default: PNSLR_LogE(PNSLR_StringLiteral("Unsupported renderer type."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; return (ret) {0};
+#define MZNT_RHI_FN_UNSUPPORTED_BRANCH(ret)          default: PNSLR_LogE(Panshilar::StringLiteral("Unsupported renderer type."), PNSLR_GET_LOC()); FORCE_DBG_TRAP; return { };
 
 #define MZNT_RHI_SWITCH_ONE_ARG(ret, tyRet, fn, tyQ, ty1, arg1, tyArg1) \
     switch (tyQ) \
@@ -106,6 +106,7 @@
     }
 
 #define MZNT_RHI_FN_ONE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -113,6 +114,7 @@
     }
 
 #define MZNT_RHI_FN_TWO_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -121,6 +123,7 @@
     }
 
 #define MZNT_RHI_FN_THREE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -130,6 +133,7 @@
     }
 
 #define MZNT_RHI_FN_FOUR_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -140,6 +144,7 @@
     }
 
 #define MZNT_RHI_FN_FIVE_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4, MZNT_RHI_ARG_DECL_##tyArg5 (ty5) arg5 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \
@@ -151,6 +156,7 @@
     }
 
 #define MZNT_RHI_FN_SIX_ARG(fn, tyQ, ret, tyRet, ty1, arg1, tyArg1, ty2, arg2, tyArg2, ty3, arg3, tyArg3, ty4, arg4, tyArg4, ty5, arg5, tyArg5, ty6, arg6, tyArg6) \
+    extern "C" \
     ret MZNT_##fn( MZNT_RHI_ARG_DECL_##tyArg1 (ty1) arg1, MZNT_RHI_ARG_DECL_##tyArg2 (ty2) arg2, MZNT_RHI_ARG_DECL_##tyArg3 (ty3) arg3, MZNT_RHI_ARG_DECL_##tyArg4 (ty4) arg4, MZNT_RHI_ARG_DECL_##tyArg5 (ty5) arg5, MZNT_RHI_ARG_DECL_##tyArg6 (ty6) arg6 ) \
     { \
         MZNT_RHI_ARG_CHECK_##tyArg1(tyQ, arg1); \

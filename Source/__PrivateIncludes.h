@@ -16,7 +16,7 @@ Muzent.
 
 #ifndef MZNT_DX12
     // TODO: implement
-    #define MZNT_DX12 0 /*(PNSLR_WINDOWS)*/
+    #define MZNT_DX12 (PNSLR_WINDOWS || PNSLR_XSERIES)
 #endif
 
 #ifndef MZNT_METAL
@@ -49,6 +49,29 @@ PNSLR_SUPPRESS_WARN
     #endif
     #include "Dependencies/VMA/vk_mem_alloc.h"
     #undef VMA_IMPLEMENTATION
+#endif
+
+#if MZNT_DX12
+    #ifndef __cplusplus
+        #define COBJMACROS
+    #endif
+
+    #include <combaseapi.h>
+    #include <d3d12.h>
+    #include <dxgi1_6.h>
+    #include <d3dcompiler.h>
+
+    #ifndef __cplusplus
+        #undef COBJMACROS
+    #endif
+
+    #ifdef __cplusplus
+        #include <dxcapi.h>
+
+        #pragma comment(lib, "d3d12.lib")
+        #pragma comment(lib, "dxgi.lib")
+        #pragma comment(lib, "d3dcompiler.lib")
+    #endif
 #endif
 
 PNSLR_UNSUPPRESS_WARN

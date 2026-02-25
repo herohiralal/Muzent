@@ -1,8 +1,9 @@
-#if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN && !defined(MZNT_VULKAN_PRIVATE_H)
+#ifndef MZNT_VULKAN_PRIVATE_H
 #define MZNT_VULKAN_PRIVATE_H
 #include "__Prelude.h"
 #include "Renderer.h"
 EXTERN_C_BEGIN
+#if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
 
 PNSLR_DECLARE_ARRAY_SLICE(VkLayerProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkExtensionProperties);
@@ -112,5 +113,6 @@ typedef struct MZNT_VulkanMesh
 MZNT_VulkanMesh* MZNT_UploadMesh_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_MeshCreateInfo* createInfo, PNSLR_Allocator tempAllocator);
 b8 MZNT_DestroyMesh_Vulkan(MZNT_VulkanMesh* mesh, PNSLR_Allocator tempAllocator);
 
+#endif
 EXTERN_C_END
 #endif

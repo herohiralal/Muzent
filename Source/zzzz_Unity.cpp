@@ -5,4 +5,7 @@
 #define MZNT_IMPLEMENTATION
 #include "Muzent.h"
 
+#include "Renderer.cpp"
+#include "DirectX12Renderer.cpp"
+
 #endif//MZNT_UNITYCXX

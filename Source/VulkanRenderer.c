@@ -1,5 +1,4 @@
 #define MZNT_IMPLEMENTATION
-#include "RendererPrivate.h"
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
