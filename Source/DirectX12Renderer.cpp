@@ -86,7 +86,10 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             hwAdapter->GetDesc1(&desc);
 
             if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            {
+                hwAdapter->Release();
                 continue;
+            }
 
             if (SUCCEEDED(D3D12CreateDevice(hwAdapter, D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nil)))
             {
@@ -255,6 +258,8 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
 
         MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->dxgiFactory->CreateSwapChainForHwnd(renderer->cmdQueue, wnd, &swapchainDesc, nil, nil, (IDXGISwapChain1**) &(output->swapchain)));
 
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->dxgiFactory->MakeWindowAssociation(wnd, DXGI_MWA_NO_ALT_ENTER)); // disable automatic fullscreen transitions on alt+enter
+
         output->swapchain->GetDesc1(&swapchainDesc);
         output->swapchainWidth  = swapchainDesc.Width;
         output->swapchainHeight = swapchainDesc.Height;
@@ -301,8 +306,10 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
         depthOptimizedClearValue.Format             = k_MZNT_Internal_PreferredDepthAttchFormat;
         depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
 
+        D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
         MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &depthDesc,
             D3D12_RESOURCE_STATE_DEPTH_WRITE,
@@ -396,7 +403,7 @@ b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, 
         surface->renderTargets[i]->Release();
 
     // resize buffers
-    surface->swapchain->ResizeBuffers(MZNT_NUM_FRAMES_IN_FLIGHT, width, height, surface->swapchainFormat, 0);
+    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->swapchain->ResizeBuffers(MZNT_NUM_FRAMES_IN_FLIGHT, width, height, surface->swapchainFormat, 0));
 
     // update height/width
     {
@@ -439,6 +446,46 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
     MZNT_DirectX12RendererCommandBuffer& cmdBuffer = surface->commandBuffers[surface->curFrame];
     cmdBuffer.cmdAllocator->Reset();
     cmdBuffer.cmdList->Reset(cmdBuffer.cmdAllocator, nil);
+
+    // transition present -> rt
+    {
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            surface->renderTargets[surface->curFrame],
+            D3D12_RESOURCE_STATE_PRESENT,
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
+    }
+
+    // bind rt
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        rtv.ptr += surface->curFrame * surface->rtvDescriptorSize;
+
+        cmdBuffer.cmdList->OMSetRenderTargets(1, &rtv, FALSE, nil);
+
+        float clearColor[4] = {r, g, b, a};
+        cmdBuffer.cmdList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+    }
+
+    // viewport & scissor
+    {
+        D3D12_VIEWPORT vp;
+        vp.Width  = (float) surface->swapchainWidth;
+        vp.Height = (float) surface->swapchainHeight;
+        cmdBuffer.cmdList->RSSetViewports(1, &vp);
+
+        D3D12_RECT scissor;
+        scissor.right  = (LONG) surface->swapchainWidth;
+        scissor.bottom = (LONG) surface->swapchainHeight;
+        cmdBuffer.cmdList->RSSetScissorRects(1, &scissor);
+    }
+
+    cmdBuffer.cmdList->SetPipelineState(surface->renderer->triangleShader.pipelineState);
+    cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->triangleShader.rootSignature);
+    cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
+
     return &cmdBuffer;
 }
 
@@ -449,7 +496,24 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
 
     MZNT_DirectX12RendererCommandBuffer& cmdBuffer = surface->commandBuffers[surface->curFrame];
 
-    // TODO: execute command list
+    // transition rt -> present
+    {
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            surface->renderTargets[surface->curFrame],
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PRESENT);
+
+        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
+    }
+
+    cmdBuffer.cmdList->Close();
+
+    // submit
+    ID3D12CommandList* cmdLists[] = { cmdBuffer.cmdList };
+    surface->renderer->cmdQueue->ExecuteCommandLists(1, cmdLists);
+
+    // present
+    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->swapchain->Present(1, 0));
 
     surface->nextFenceValue++;
     surface->frameFenceValues[surface->curFrame] = surface->nextFenceValue;
