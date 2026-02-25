@@ -1,7 +1,8 @@
-#ifndef MZNT_DX12_PRIVATE_HXX
-#define MZNT_DX12_PRIVATE_HXX
+#ifndef MZNT_DX12_PRIVATE_H
+#define MZNT_DX12_PRIVATE_H
 #include "__Prelude.h"
 #include "Renderer.h"
+EXTERN_C_BEGIN
 #if defined(MZNT_IMPLEMENTATION) && MZNT_DX12
 
 typedef struct MZNT_DirectX12Shader
@@ -101,4 +102,5 @@ MZNT_DirectX12Mesh* MZNT_UploadMesh_DirectX12(MZNT_DirectX12Renderer* renderer, 
 b8 MZNT_DestroyMesh_DirectX12(MZNT_DirectX12Mesh* mesh, PNSLR_Allocator tempAllocator);
 
 #endif
+EXTERN_C_END
 #endif

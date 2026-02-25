@@ -7,6 +7,7 @@
 
 #include "../../Panshilar/Source/zzzz_Unity.c"
 
+#include "Renderer.c"
 #include "VulkanRenderer.c"
 
 #endif//MZNT_UNITY_C

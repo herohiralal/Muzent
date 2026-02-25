@@ -1,5 +1,5 @@
 #define MZNT_IMPLEMENTATION
-#include "DirectX12Renderer.hpp"
+#include "DirectX12Renderer.h"
 #if MZNT_DX12
 
 static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
@@ -22,7 +22,7 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
 
     if (result != S_OK)
     {
-        PNSLR_LogEf(Panshilar::StringLiteral("DirectX 12 error: $ from $"),
+        PNSLR_LogEf(PNSLR_StringLiteral("DirectX 12 error: $ from $"),
                     PNSLR_FmtArgs(
                         PNSLR_FmtString(message),
                         PNSLR_FmtString(fnCall)
@@ -38,10 +38,24 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
-    if (PNSLR_DBG) {
+    UINT dxgiFactoryFlags = 0;
+
+    if (PNSLR_DBG)
+    {
         ID3D12Debug* debugController;
         MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
+        debugController->EnableDebugLayer();
+
+        ID3D12Debug1* dbg1;
+        if (S_OK == debugController->QueryInterface(IID_PPV_ARGS(&dbg1)))
+        {
+            dbg1->SetEnableGPUBasedValidation(true);
+            dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+        }
     }
+
+    IDXGIFactory4* factory;
+    MZNT_INTERNAL_DX12_CHECKED_CALL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
     return nil;
 }

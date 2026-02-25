@@ -53,6 +53,7 @@ PNSLR_SUPPRESS_WARN
 
 #if MZNT_DX12
     #ifndef __cplusplus
+        #define CINTERFACE
         #define COBJMACROS
     #endif
 
@@ -63,11 +64,13 @@ PNSLR_SUPPRESS_WARN
 
     #ifndef __cplusplus
         #undef COBJMACROS
+        #undef CINTERFACE
     #endif
 
     #ifdef __cplusplus
         #include <dxcapi.h>
 
+        #pragma comment(lib, "dxguid.lib")
         #pragma comment(lib, "d3d12.lib")
         #pragma comment(lib, "dxgi.lib")
         #pragma comment(lib, "d3dcompiler.lib")

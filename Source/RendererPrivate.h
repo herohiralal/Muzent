@@ -3,5 +3,5 @@
 #include "__Prelude.h"
 #include "Renderer.h"
 #include "VulkanRenderer.h"
-#include "DirectX12Renderer.hpp"
+#include "DirectX12Renderer.h"
 #endif
