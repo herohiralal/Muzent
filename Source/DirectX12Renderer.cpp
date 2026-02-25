@@ -156,50 +156,9 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             psoDesc.DSVFormat                      = k_DVRPL_Internal_PreferredDepthAttchFormat;
             psoDesc.SampleDesc.Count               = 1;
             psoDesc.SampleMask                     = UINT_MAX;
-
-            psoDesc.RasterizerState.FillMode              = D3D12_FILL_MODE_SOLID;
-            psoDesc.RasterizerState.CullMode              = D3D12_CULL_MODE_BACK;
-            psoDesc.RasterizerState.FrontCounterClockwise = false;
-            psoDesc.RasterizerState.DepthBias             = D3D12_DEFAULT_DEPTH_BIAS;
-            psoDesc.RasterizerState.DepthBiasClamp        = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-            psoDesc.RasterizerState.SlopeScaledDepthBias  = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-            psoDesc.RasterizerState.DepthClipEnable       = true;
-            psoDesc.RasterizerState.MultisampleEnable     = false;
-            psoDesc.RasterizerState.AntialiasedLineEnable = false;
-            psoDesc.RasterizerState.ForcedSampleCount     = 0;
-            psoDesc.RasterizerState.ConservativeRaster    = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
-
-            psoDesc.BlendState.AlphaToCoverageEnable      = false;
-            psoDesc.BlendState.IndependentBlendEnable     = false;
-            for (u32 i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
-            {
-                D3D12_RENDER_TARGET_BLEND_DESC& blendDesc = psoDesc.BlendState.RenderTarget[i];
-                blendDesc.BlendEnable                     = false;
-                blendDesc.LogicOpEnable                   = false;
-                blendDesc.SrcBlend                        = D3D12_BLEND_ONE;
-                blendDesc.DestBlend                       = D3D12_BLEND_ZERO;
-                blendDesc.BlendOp                         = D3D12_BLEND_OP_ADD;
-                blendDesc.SrcBlendAlpha                   = D3D12_BLEND_ONE;
-                blendDesc.DestBlendAlpha                  = D3D12_BLEND_ZERO;
-                blendDesc.BlendOpAlpha                    = D3D12_BLEND_OP_ADD;
-                blendDesc.LogicOp                         = D3D12_LOGIC_OP_NOOP;
-                blendDesc.RenderTargetWriteMask           = D3D12_COLOR_WRITE_ENABLE_ALL;
-            }
-
-            psoDesc.DepthStencilState.DepthEnable          = true;
-            psoDesc.DepthStencilState.DepthWriteMask       = D3D12_DEPTH_WRITE_MASK_ALL;
-            psoDesc.DepthStencilState.DepthFunc            = D3D12_COMPARISON_FUNC_LESS;
-            psoDesc.DepthStencilState.StencilEnable        = false;
-            psoDesc.DepthStencilState.StencilReadMask      = D3D12_DEFAULT_STENCIL_READ_MASK;
-            psoDesc.DepthStencilState.StencilWriteMask     = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-            psoDesc.DepthStencilState.FrontFace.StencilFailOp      = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.FrontFace.StencilPassOp      = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.FrontFace.StencilFunc        = D3D12_COMPARISON_FUNC_ALWAYS;
-            psoDesc.DepthStencilState.BackFace.StencilFailOp       = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.BackFace.StencilDepthFailOp  = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.BackFace.StencilPassOp       = D3D12_STENCIL_OP_KEEP;
-            psoDesc.DepthStencilState.BackFace.StencilFunc         = D3D12_COMPARISON_FUNC_ALWAYS;
+            psoDesc.RasterizerState                = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoDesc.BlendState                     = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+            psoDesc.DepthStencilState              = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
             MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->triangleShader.pipelineState))));
         }
