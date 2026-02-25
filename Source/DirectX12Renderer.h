@@ -15,17 +15,15 @@ typedef struct MZNT_DirectX12Shader
 
 typedef struct MZNT_DirectX12Renderer
 {
-    MZNT_Renderer  parent;
-    IDXGIFactory6* dxgiFactory;
-    IDXGIAdapter1* adapter;
-    ID3D12Device*  device;
+    MZNT_Renderer       parent;
+    IDXGIFactory6*      dxgiFactory;
+    IDXGIAdapter1*      adapter;
+    ID3D12Device*       device;
+    ID3D12CommandQueue* cmdQueue;
 
-    ID3D12CommandQueue* gfxQueue;
-    ID3D12CommandQueue* presQueue;
+    ID3D12Debug6* dbgController;
 
-    ID3D12Debug* debugController;
-
-    // TODO: add d3d12 memory allocator here
+    void* memoryAllocator; // D3D12MA::Allocator*; can't make type safe here because it's a c++ class
 
     MZNT_DirectX12Shader triangleShader;
 } MZNT_DirectX12Renderer;
