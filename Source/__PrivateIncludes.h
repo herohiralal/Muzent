@@ -62,13 +62,13 @@ PNSLR_SUPPRESS_WARN
     #include <dxgi1_6.h>
     #include <d3dcompiler.h>
 
-    #ifndef __cplusplus
-        #undef COBJMACROS
-        #undef CINTERFACE
-    #endif
+    #undef COBJMACROS
+    #undef CINTERFACE
 
     #ifdef __cplusplus
         #include <dxcapi.h>
+        #include "Dependencies/D3D12MA/D3D12MemAlloc.h"
+        #include "Dependencies/D3D12MA/D3D12MemAlloc.cpp"
 
         #pragma comment(lib, "dxguid.lib")
         #pragma comment(lib, "d3d12.lib")
