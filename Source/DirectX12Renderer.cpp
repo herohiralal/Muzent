@@ -64,8 +64,14 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     {
         MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12GetDebugInterface(IID_PPV_ARGS(&(output->dbgController))));
         output->dbgController->EnableDebugLayer();
-        output->dbgController->SetEnableGPUBasedValidation(true);
-        dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
+        ID3D12Debug1* dbgController1;
+        if (SUCCEEDED(output->dbgController->QueryInterface(IID_PPV_ARGS(&dbgController1))))
+        {
+            dbgController1->SetEnableGPUBasedValidation(true);
+            dbgController1->Release();
+            dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+        }
     }
 
     // factory
@@ -199,7 +205,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
         }
     }
 
-    return nil;
+    return output;
 }
 
 b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Allocator tempAllocator)
@@ -221,8 +227,20 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 
     if (renderer->dbgController)
     {
-        renderer->dbgController->SetEnableGPUBasedValidation(false);
-        renderer->dbgController->DisableDebugLayer();
+        ID3D12Debug1* dbgController1;
+        if (SUCCEEDED(renderer->dbgController->QueryInterface(IID_PPV_ARGS(&dbgController1))))
+        {
+            dbgController1->SetEnableGPUBasedValidation(false);
+            dbgController1->Release();
+        }
+
+        ID3D12Debug4* dbgController4;
+        if (SUCCEEDED(renderer->dbgController->QueryInterface(IID_PPV_ARGS(&dbgController4))))
+        {
+            dbgController4->DisableDebugLayer();
+            dbgController4->Release();
+        }
+
         renderer->dbgController->Release();
     }
 
@@ -233,12 +251,20 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 
 MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
 {
-    return nil;
+    MZNT_DirectX12RendererSurface* output = PNSLR_New(MZNT_DirectX12RendererSurface, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    if (!output) FORCE_DBG_TRAP;
+
+    output->parent.type = MZNT_RendererType_DirectX12;
+    output->renderer    = renderer;
+
+    return output;
 }
 
 b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocator tempAllocator)
 {
-    return false;
+    PNSLR_Delete(surface, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    return true;
 }
 
 b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator)

@@ -19,7 +19,7 @@ typedef struct MZNT_DirectX12Renderer
     ID3D12Device*       device;
     ID3D12CommandQueue* cmdQueue;
 
-    ID3D12Debug6* dbgController;
+    ID3D12Debug* dbgController;
 
     void* memoryAllocator; // D3D12MA::Allocator*; can't make type safe here because it's a c++ class
 
