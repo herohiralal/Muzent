@@ -65,7 +65,8 @@ typedef struct MZNT_DirectX12RendererSurface
     // synchronization
     UINT         curFrame;
     ID3D12Fence* fence;
-    UINT64       fenceValue;
+    UINT64       frameFenceValues[MZNT_NUM_FRAMES_IN_FLIGHT];
+    UINT64       nextFenceValue;
     HANDLE       fenceEvent;
 } MZNT_DirectX12RendererSurface;
 
