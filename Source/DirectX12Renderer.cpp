@@ -46,7 +46,7 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
 #define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
     MZNT_Internal_LogDx12ResultOnFailure((call), Panshilar::StringLiteral(#call), PNSLR_GET_LOC())
 
-static const DXGI_FORMAT k_MZNT_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_B8G8R8A8_UNORM;
+static const DXGI_FORMAT k_MZNT_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
@@ -283,11 +283,8 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         D3D12_CPU_DESCRIPTOR_HANDLE svHandle = surface->svHeap->GetCPUDescriptorHandleForHeapStart();
         for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            ID3D12Resource* screenBuffer = surface->screenBuffer[i];
-            surface->renderer->device->CreateRenderTargetView(screenBuffer, &rtvDesc, svHandle);
+            surface->renderer->device->CreateRenderTargetView(surface->screenBuffer[i], &rtvDesc, svHandle);
             svHandle.ptr += surface->svDescriptorSize;
-
-            surface->svRts[i] = screenBuffer;
         }
     }
 
@@ -332,11 +329,8 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = surface->dsvHeap->GetCPUDescriptorHandleForHeapStart();
         for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            ID3D12Resource* depthBuffer = surface->depthBuffer[i];
-            surface->renderer->device->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHandle);
+            surface->renderer->device->CreateDepthStencilView(surface->depthBuffer[i], &dsvDesc, dsvHandle);
             dsvHandle.ptr += surface->dsvDescriptorSize;
-
-            surface->dsVs[i] = depthBuffer;
         }
     }
 }
@@ -519,6 +513,7 @@ b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, 
 
     return true;
 }
+
 MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
 {
     if (!surface) return nil;
