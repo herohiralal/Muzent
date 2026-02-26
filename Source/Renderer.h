@@ -74,7 +74,7 @@ b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
 /**
  * The number of frames that can be processed concurrently.
  */
-#define MZNT_NUM_FRAMES_IN_FLIGHT 3
+#define MZNT_NUM_FRAMES_IN_FLIGHT 2
 
 //-skipreflect
 

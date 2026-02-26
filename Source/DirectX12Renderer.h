@@ -43,21 +43,25 @@ typedef struct MZNT_DirectX12RendererSurface
     MZNT_DirectX12Renderer* renderer; // owning renderer instance
 
     // swapchain
-    IDXGISwapChain4* swapchain;
-    UINT             swapchainWidth, swapchainHeight;
-    DXGI_FORMAT      swapchainFormat;
-    ID3D12Resource*  renderTargets[MZNT_NUM_FRAMES_IN_FLIGHT]; // back buffers from the swapchain
+    IDXGISwapChain4*      swapchain;
+    UINT                  swapchainWidth, swapchainHeight;
+    DXGI_FORMAT           swapchainFormat;
+    ID3D12DescriptorHeap* swapchainRtvHeap;
+    UINT                  swapchainRtvDescriptorSize;
+    ID3D12Resource*       swapchainRTs[MZNT_NUM_FRAMES_IN_FLIGHT]; // back buffers from the swapchain
 
-    // descriptor heaps
-    ID3D12DescriptorHeap* rtvHeap;
-    UINT                  rtvDescriptorSize;
+    // screen buffer
+    ID3D12Resource*       screenBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
+    ID3D12DescriptorHeap* svHeap;
+    UINT                  svDescriptorSize;
+    ID3D12Resource*       svRts[MZNT_NUM_FRAMES_IN_FLIGHT];
 
     // depth
-    ID3D12Resource*       depthBuffer;
+    ID3D12Resource*       depthBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
     ID3D12DescriptorHeap* dsvHeap;
+    UINT                  dsvDescriptorSize;
+    ID3D12Resource*       dsVs[MZNT_NUM_FRAMES_IN_FLIGHT];
 
-    // pipeline
-    ID3D12PipelineState*  trianglePipeline;
 
     // command buffers (frames in flight)
     MZNT_DirectX12RendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
