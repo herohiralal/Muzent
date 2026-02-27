@@ -144,6 +144,33 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     // device
     MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12CreateDevice(output->adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&(output->device))));
 
+    // info queue setup
+    {
+        ID3D12InfoQueue* infoQueue = nil;
+        if (SUCCEEDED(output->device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
+        {
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+
+            // hide some annoying warnings, like clearing render target with a different value than initialised from
+            // the day that clearing a render target with a different colour than the "optimised" one becomes my bottleneck,
+            // i'll leave game development forever and get a boring lifeless finance job or something
+
+            D3D12_MESSAGE_ID hide[] = {
+                D3D12_MESSAGE_ID_CREATEDEVICE_DEBUG_LAYER_STARTUP_OPTIONS,
+                D3D12_MESSAGE_ID_CLEARRENDERTARGETVIEW_MISMATCHINGCLEARVALUE,
+            };
+
+            D3D12_INFO_QUEUE_FILTER filter = { };
+            filter.DenyList.NumIDs = _countof(hide);
+            filter.DenyList.pIDList = hide;
+
+            infoQueue->AddStorageFilterEntries(&filter);
+
+            infoQueue->Release();
+        }
+    }
+
     // queue
     D3D12_COMMAND_QUEUE_DESC queueDesc = { };
     queueDesc.Type     = D3D12_COMMAND_LIST_TYPE_DIRECT;
