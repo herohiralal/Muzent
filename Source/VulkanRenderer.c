@@ -1026,16 +1026,21 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDescriptorSetLayout(renderer->device, &(VkDescriptorSetLayoutCreateInfo)
         {
             .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
+            .bindingCount = 2,
             .pBindings    = (VkDescriptorSetLayoutBinding[])
             {
                 {
                     .binding            = 0,
-                    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
                     .descriptorCount    = 1,
                     .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
-                    .pImmutableSamplers = nil,
                 },
+                {
+                    .binding            = 1,
+                    .descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER,
+                    .descriptorCount    = 1,
+                    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+                }
             }
         }, nil, &output->finalBlitShader.descriptorSetLayout));
 
@@ -1298,8 +1303,6 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
     // draw triangle
     {
         vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->triangleShader.pipeline);
-        vkCmdBindVertexBuffers2(cmdBuf->cmdBuffer, 0, 0, nil, nil, nil, nil);
-        vkCmdBindIndexBuffer2(cmdBuf->cmdBuffer, nil, 0, 0, VK_INDEX_TYPE_UINT16);
         vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
     }
 
@@ -1401,8 +1404,6 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         vkCmdBindDescriptorSets(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipelineLayout,
             0, 1, &descriptorSet, 0, nil);
 
-        vkCmdBindVertexBuffers2(cmdBuf->cmdBuffer, 0, 0, nil, nil, nil, nil);
-        vkCmdBindIndexBuffer2(cmdBuf->cmdBuffer, nil, 0, 0, VK_INDEX_TYPE_UINT16);
         vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
     }
 
