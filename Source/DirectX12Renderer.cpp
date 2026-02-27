@@ -2,19 +2,19 @@
 #include "DirectX12Renderer.h"
 #if MZNT_DX12
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_TriangleShaderVS
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12TriangleShaderVS
 #include "Shaders/triangle_dxil_vs.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_TriangleShaderPS
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12TriangleShaderPS
 #include "Shaders/triangle_dxil_ps.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_FullscreenBlitShaderVS
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullscreenBlitShaderVS
 #include "Shaders/fullscreenBlit_dxil_vs.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_FullscreenBlitShaderPS
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullscreenBlitShaderPS
 #include "Shaders/fullscreenBlit_dxil_ps.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
@@ -217,10 +217,10 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
 
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
             psoDesc.pRootSignature                  = output->triangleShader.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_TriangleShaderVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_TriangleShaderVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_TriangleShaderPSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_TriangleShaderPSSize;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12TriangleShaderVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12TriangleShaderVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12TriangleShaderPSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12TriangleShaderPSSize;
             psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -588,10 +588,10 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
 
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
             psoDesc.pRootSignature                  = output->finalBlitShader.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_FullscreenBlitShaderVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_FullscreenBlitShaderVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_FullscreenBlitShaderPSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_FullscreenBlitShaderPSSize;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12FullscreenBlitShaderVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12FullscreenBlitShaderVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12FullscreenBlitShaderPSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12FullscreenBlitShaderPSSize;
             psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
