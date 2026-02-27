@@ -95,6 +95,8 @@ typedef struct MZNT_VulkanRendererSurface
     // shaders
     MZNT_VulkanShader finalBlitShader;
     VkSampler         finalBlitSampler;
+    VkDescriptorPool  finalBlitDescriptorPool;
+    VkDescriptorSet   finalBlitDescriptorSets[MZNT_NUM_FRAMES_IN_FLIGHT];
 } MZNT_VulkanRendererSurface;
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);

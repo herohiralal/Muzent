@@ -1142,6 +1142,38 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
                 .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
             },
         }, nil, &output->finalBlitShader.pipeline));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDescriptorPool(renderer->device, &(VkDescriptorPoolCreateInfo)
+        {
+            .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .maxSets       = MZNT_NUM_FRAMES_IN_FLIGHT,
+            .flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+            .poolSizeCount = 2,
+            .pPoolSizes    = (VkDescriptorPoolSize[])
+            {
+                {
+                    .type            = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                    .descriptorCount = MZNT_NUM_FRAMES_IN_FLIGHT,
+                },
+                {
+                    .type            = VK_DESCRIPTOR_TYPE_SAMPLER,
+                    .descriptorCount = MZNT_NUM_FRAMES_IN_FLIGHT,
+                }
+            }
+        }, nil, &output->finalBlitDescriptorPool));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateDescriptorSets(renderer->device, &(VkDescriptorSetAllocateInfo)
+        {
+            .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool     = output->finalBlitDescriptorPool,
+            .descriptorSetCount = MZNT_NUM_FRAMES_IN_FLIGHT,
+            .pSetLayouts        = (VkDescriptorSetLayout[])
+            {
+                output->finalBlitShader.descriptorSetLayout,
+                output->finalBlitShader.descriptorSetLayout,
+                output->finalBlitShader.descriptorSetLayout,
+            },
+        }, output->finalBlitDescriptorSets));
     }
 
     return output;
@@ -1154,6 +1186,8 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
 
+    vkFreeDescriptorSets(surface->renderer->device, surface->finalBlitDescriptorPool, MZNT_NUM_FRAMES_IN_FLIGHT, surface->finalBlitDescriptorSets);
+    vkDestroyDescriptorPool(surface->renderer->device, surface->finalBlitDescriptorPool, nil);
     vkDestroyPipeline(surface->renderer->device, surface->finalBlitShader.pipeline, nil);
     vkDestroyPipelineLayout(surface->renderer->device, surface->finalBlitShader.pipelineLayout, nil);
     vkDestroyDescriptorSetLayout(surface->renderer->device, surface->finalBlitShader.descriptorSetLayout, nil);
@@ -1267,6 +1301,52 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     }));
 
+    // screenbuffer: undefined -> rt, swapchain: undefined -> present
+    vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
+    {
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 2,
+        .pImageMemoryBarriers    = (VkImageMemoryBarrier2[])
+        {
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .srcAccessMask       = VK_ACCESS_2_NONE,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .image               = surface->screenImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
+            },
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .srcAccessMask       = VK_ACCESS_2_NONE,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .dstAccessMask       = VK_ACCESS_2_NONE,
+                .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
+            },
+        }
+    });
+
     // viewport and scissor
     {
         vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
@@ -1290,7 +1370,7 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         {
             .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
             .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
-            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue  = {.color = {.float32 = {r, g, b, a}}},
@@ -1328,7 +1408,7 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
                 .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                 .dstStageMask        = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
                 .dstAccessMask       = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                .oldLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+                .oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .image               = surface->screenImages.data[surface->curSwpchImgIdx],
                 .subresourceRange    =
@@ -1371,8 +1451,8 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         .pColorAttachments = &(VkRenderingAttachmentInfo)
         {
             .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
-            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .imageView   = surface->swapchainImageViews.data[surface->curSwpchImgIdx],
+            .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
         },
@@ -1385,24 +1465,35 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
     {
         vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipeline);
 
-        VkDescriptorSet descriptorSet = nil;
-        vkUpdateDescriptorSets(surface->renderer->device, 1, &(VkWriteDescriptorSet)
+        vkUpdateDescriptorSets(surface->renderer->device, 2, (VkWriteDescriptorSet[])
         {
-            .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet          = descriptorSet,
-            .dstBinding      = 0,
-            .descriptorCount = 1,
-            .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo      = &(VkDescriptorImageInfo)
             {
-                .sampler     = surface->finalBlitSampler,
-                .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
-                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet          = surface->finalBlitDescriptorSets[surface->curFrame],
+                .dstBinding      = 0,
+                .descriptorCount = 1,
+                .descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .pImageInfo      = &(VkDescriptorImageInfo)
+                {
+                    .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                },
             },
+            {
+                .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet          = surface->finalBlitDescriptorSets[surface->curFrame],
+                .dstBinding      = 1,
+                .descriptorCount = 1,
+                .descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER,
+                .pImageInfo      = &(VkDescriptorImageInfo)
+                {
+                    .sampler = surface->finalBlitSampler,
+                },
+            }
         }, 0, nil);
 
         vkCmdBindDescriptorSets(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipelineLayout,
-            0, 1, &descriptorSet, 0, nil);
+            0, 1, &(surface->finalBlitDescriptorSets[surface->curFrame]), 0, nil);
 
         vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
     }
