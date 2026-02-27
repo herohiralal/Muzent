@@ -535,16 +535,103 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     // triangle shader pipeline
     {
-        VkShaderModuleCreateInfo triangleShMCi = {
-            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
+        {
+            .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .codeSize = (size_t) k_MZNT_Internal_TriangleShaderSize,
-            .pCode = (u32*) k_MZNT_Internal_TriangleShaderContents,
+            .pCode    = (u32*)   k_MZNT_Internal_TriangleShaderContents,
+        }, nil, &output->triangleShader.module));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &(VkPipelineLayoutCreateInfo)
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        }, nil, &output->triangleShader.layout));
+
+        VkPipelineShaderStageCreateInfo triangleShaderStages[] = {
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = output->triangleShader.module,
+                .pName  = "vertMain",
+            },
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = output->triangleShader.module,
+                .pName  = "fragMain",
+            },
         };
 
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &triangleShMCi, nil, &output->triangleShader.module));
+        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &pipelineLayoutInfo, nil, &output->triangleShader.layout));
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(output->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
+        {
+            .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .stageCount                  = sizeof(triangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages                     = triangleShaderStages,
+            .pVertexInputState           = &(VkPipelineVertexInputStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            },
+            .pInputAssemblyState         = &(VkPipelineInputAssemblyStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                .topology                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            },
+            .pViewportState              = &(VkPipelineViewportStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                .viewportCount           = 1,
+                .scissorCount            = 1,
+            },
+            .pRasterizationState         = &(VkPipelineRasterizationStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                .depthClampEnable        = VK_FALSE,
+                .rasterizerDiscardEnable = VK_FALSE,
+                .polygonMode             = VK_POLYGON_MODE_FILL,
+                .cullMode                = VK_CULL_MODE_BACK_BIT,
+                .frontFace               = VK_FRONT_FACE_CLOCKWISE,
+                .depthBiasEnable         = VK_FALSE,
+                .depthBiasSlopeFactor    = 1.0f,
+                .lineWidth               = 1.0f,
+            },
+            .pMultisampleState           = &(VkPipelineMultisampleStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                .rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT,
+            },
+            .pColorBlendState            = &(VkPipelineColorBlendStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                .logicOpEnable           = VK_FALSE,
+                .logicOp                 = VK_LOGIC_OP_COPY,
+                .attachmentCount         = 1,
+                .pAttachments            = &(VkPipelineColorBlendAttachmentState)
+                {
+                    .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT |
+                                           VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT |
+                                           VK_COLOR_COMPONENT_A_BIT,
+                },
+            },
+            .pDynamicState               = &(VkPipelineDynamicStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
+                .pDynamicStates          = dynamicStates,
+            },
+            .layout                      = output->triangleShader.layout,
+            .renderPass                  = VK_NULL_HANDLE,
+            .pNext                       = &(VkPipelineRenderingCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .colorAttachmentCount    = 1,
+                .pColorAttachmentFormats = &k_MZNT_Internal_PreferredVkColourAttchFormat,
+                .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
+                .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+            },
+        }, nil, &output->triangleShader.pipeline));
     }
 
     return output;
@@ -556,6 +643,7 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
 
+    vkDestroyPipeline(renderer->device, renderer->triangleShader.pipeline, nil);
     vkDestroyPipelineLayout(renderer->device, renderer->triangleShader.layout, nil);
     vkDestroyShaderModule(renderer->device, renderer->triangleShader.module, nil);
 
@@ -685,6 +773,120 @@ void MZNT_Internal_CreateVkSwapchainImagesAndViews(MZNT_VulkanRendererSurface* s
             }, nil, &(surface->swapchainImageViews.data[i])));
         }
     }
+
+    // screen buffer
+    {
+        surface->screenImages = PNSLR_MakeSlice(VkImage, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        surface->screenImageAllocations = PNSLR_MakeSlice(VmaAllocation, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        surface->screenImageViews = PNSLR_MakeSlice(VkImageView, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+        for (i64 i = 0; i < surface->swapchainImages.count; i++)
+        {
+            MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateImage(surface->renderer->vmaAllocator, &(VkImageCreateInfo)
+            {
+                .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .imageType     = VK_IMAGE_TYPE_2D,
+                .format        = k_MZNT_Internal_PreferredVkColourAttchFormat,
+                .extent        =
+                {
+                    .width     = surface->swapchainExtent.width,
+                    .height    = surface->swapchainExtent.height,
+                    .depth     = 1,
+                },
+                .mipLevels     = 1,
+                .arrayLayers   = 1,
+                .samples       = VK_SAMPLE_COUNT_1_BIT,
+                .tiling        = VK_IMAGE_TILING_OPTIMAL,
+                .usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            &(VmaAllocationCreateInfo)
+            {
+                .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+                .usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+            }, &(surface->screenImages.data[i]), &(surface->screenImageAllocations.data[i]), nil));
+
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(surface->renderer->device, &(VkImageViewCreateInfo)
+            {
+                .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image      = surface->screenImages.data[i],
+                .viewType   = VK_IMAGE_VIEW_TYPE_2D,
+                .format     = k_MZNT_Internal_PreferredVkColourAttchFormat,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+                },
+            }, nil, &surface->screenImageViews.data[i]));
+        }
+    }
+
+    // depth image
+    {
+        surface->depthImages = PNSLR_MakeSlice(VkImage, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        surface->depthImageAllocations = PNSLR_MakeSlice(VmaAllocation, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        surface->depthImageViews = PNSLR_MakeSlice(VkImageView, surface->swapchainImages.count, false, surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+        for (i64 i = 0; i < surface->swapchainImages.count; i++)
+        {
+            MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateImage(surface->renderer->vmaAllocator, &(VkImageCreateInfo)
+            {
+                .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .imageType     = VK_IMAGE_TYPE_2D,
+                .format        = k_MZNT_Internal_PreferredVkDepthAttchFormat,
+                .extent        =
+                {
+                    .width     = surface->swapchainExtent.width,
+                    .height    = surface->swapchainExtent.height,
+                    .depth     = 1,
+                },
+                .mipLevels     = 1,
+                .arrayLayers   = 1,
+                .samples       = VK_SAMPLE_COUNT_1_BIT,
+                .tiling        = VK_IMAGE_TILING_OPTIMAL,
+                .usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            &(VmaAllocationCreateInfo)
+            {
+                .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+                .usage = VMA_MEMORY_USAGE_AUTO,
+            }, &(surface->depthImages.data[i]), &(surface->depthImageAllocations.data[i]), nil));
+
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(surface->renderer->device, &(VkImageViewCreateInfo)
+            {
+                .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image      = surface->depthImages.data[i],
+                .viewType   = VK_IMAGE_VIEW_TYPE_2D,
+                .format     = k_MZNT_Internal_PreferredVkDepthAttchFormat,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+                },
+            }, nil, &surface->depthImageViews.data[i]));
+        }
+    }
 }
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator)
@@ -794,144 +996,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
     }
 
-    // depth image
-    {
-        MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateImage(renderer->vmaAllocator, &(VkImageCreateInfo)
-        {
-            .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .imageType     = VK_IMAGE_TYPE_2D,
-            .format        = k_MZNT_Internal_PreferredVkDepthAttchFormat,
-            .extent        =
-            {
-                .width     = output->swapchainExtent.width,
-                .height    = output->swapchainExtent.height,
-                .depth     = 1,
-            },
-            .mipLevels     = 1,
-            .arrayLayers   = 1,
-            .samples       = VK_SAMPLE_COUNT_1_BIT,
-            .tiling        = VK_IMAGE_TILING_OPTIMAL,
-            .usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        },
-        &(VmaAllocationCreateInfo)
-        {
-            .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
-            .usage = VMA_MEMORY_USAGE_AUTO,
-        }, &(output->depthImage), &(output->depthImageAllocation), nil));
-
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(renderer->device, &(VkImageViewCreateInfo)
-        {
-            .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image      = output->depthImage,
-            .viewType   = VK_IMAGE_VIEW_TYPE_2D,
-            .format     = k_MZNT_Internal_PreferredVkDepthAttchFormat,
-            .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-            .subresourceRange =
-            {
-                .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
-                .baseMipLevel   = 0,
-                .levelCount     = VK_REMAINING_MIP_LEVELS,
-                .baseArrayLayer = 0,
-                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
-            },
-        }, nil, &output->depthImageView));
-    }
-
-    {
-        VkPipelineShaderStageCreateInfo triangleShaderStages[] = {
-            {
-                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage  = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = renderer->triangleShader.module,
-                .pName  = "vertMain",
-            },
-            {
-                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = renderer->triangleShader.module,
-                .pName  = "fragMain",
-            },
-        };
-
-        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
-        {
-            .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .stageCount                  = sizeof(triangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
-            .pStages                     = triangleShaderStages,
-            .pVertexInputState           = &(VkPipelineVertexInputStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-            },
-            .pInputAssemblyState         = &(VkPipelineInputAssemblyStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                .topology                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            },
-            .pViewportState              = &(VkPipelineViewportStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-                .viewportCount           = 1,
-                .scissorCount            = 1,
-            },
-            .pRasterizationState         = &(VkPipelineRasterizationStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-                .depthClampEnable        = VK_FALSE,
-                .rasterizerDiscardEnable = VK_FALSE,
-                .polygonMode             = VK_POLYGON_MODE_FILL,
-                .cullMode                = VK_CULL_MODE_BACK_BIT,
-                .frontFace               = VK_FRONT_FACE_CLOCKWISE,
-                .depthBiasEnable         = VK_FALSE,
-                .depthBiasSlopeFactor    = 1.0f,
-                .lineWidth               = 1.0f,
-            },
-            .pMultisampleState           = &(VkPipelineMultisampleStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-                .rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT,
-            },
-            .pColorBlendState            = &(VkPipelineColorBlendStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-                .logicOpEnable           = VK_FALSE,
-                .logicOp                 = VK_LOGIC_OP_COPY,
-                .attachmentCount         = 1,
-                .pAttachments            = &(VkPipelineColorBlendAttachmentState)
-                {
-                    .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT |
-                                           VK_COLOR_COMPONENT_G_BIT |
-                                           VK_COLOR_COMPONENT_B_BIT |
-                                           VK_COLOR_COMPONENT_A_BIT,
-                },
-            },
-            .pDynamicState               = &(VkPipelineDynamicStateCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-                .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
-                .pDynamicStates          = dynamicStates,
-            },
-            .layout                      = renderer->triangleShader.layout,
-            .renderPass                  = VK_NULL_HANDLE,
-            .pNext                       = &(VkPipelineRenderingCreateInfo)
-            {
-                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
-                .colorAttachmentCount    = 1,
-                .pColorAttachmentFormats = &output->swapchainImageFormat.format,
-                .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
-                .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
-            },
-        }, nil, &output->trianglePipeline));
-    }
-
     return output;
 }
 
@@ -941,11 +1005,6 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     if (!surface->renderer) FORCE_DBG_TRAP;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
-
-    vkDestroyPipeline(surface->renderer->device, surface->trianglePipeline, nil);
-
-    vmaDestroyImage(surface->renderer->vmaAllocator, surface->depthImage, surface->depthImageAllocation);
-    vkDestroyImageView(surface->renderer->device, surface->depthImageView, nil);
 
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)
@@ -968,6 +1027,23 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
+        vkDestroyImageView(surface->renderer->device, surface->depthImageViews.data[i], nil);
+        vmaDestroyImage(surface->renderer->vmaAllocator, surface->depthImages.data[i], surface->depthImageAllocations.data[i]);
+
+        vkDestroyImageView(surface->renderer->device, surface->screenImageViews.data[i], nil);
+        vmaDestroyImage(surface->renderer->vmaAllocator, surface->screenImages.data[i], surface->screenImageAllocations.data[i]);
+    }
+
+    PNSLR_FreeSlice(&(surface->depthImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->depthImageAllocations), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->depthImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    PNSLR_FreeSlice(&(surface->screenImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->screenImageAllocations), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->screenImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
+    {
         vkDestroyImageView(surface->renderer->device, surface->swapchainImageViews.data[i], nil);
     }
 
@@ -984,11 +1060,27 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
 
 b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator)
 {
-    // TODO: resize depth image as well
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueWaitIdle(surface->renderer->gfxQueue));
+
+    for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
+    {
+        vkDestroyImageView(surface->renderer->device, surface->depthImageViews.data[i], nil);
+        vmaDestroyImage(surface->renderer->vmaAllocator, surface->depthImages.data[i], surface->depthImageAllocations.data[i]);
+
+        vkDestroyImageView(surface->renderer->device, surface->screenImageViews.data[i], nil);
+        vmaDestroyImage(surface->renderer->vmaAllocator, surface->screenImages.data[i], surface->screenImageAllocations.data[i]);
+    }
+
+    PNSLR_FreeSlice(&(surface->depthImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->depthImageAllocations), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->depthImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    PNSLR_FreeSlice(&(surface->screenImageViews), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->screenImageAllocations), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(surface->screenImages), surface->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {

@@ -18,10 +18,13 @@ PNSLR_DECLARE_ARRAY_SLICE(VkPresentModeKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkFence);
 PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
 
+PNSLR_DECLARE_ARRAY_SLICE(VmaAllocation);
+
 typedef struct MZNT_VulkanShader
 {
     VkShaderModule   module;
     VkPipelineLayout layout;
+    VkPipeline       pipeline;
 } MZNT_VulkanShader;
 
 typedef struct MZNT_VulkanRenderer
@@ -62,13 +65,15 @@ typedef struct MZNT_VulkanRendererSurface
     VkSurfaceKHR  surface;
     VkCommandPool cmdPool;
 
-    // depth stuff
-    VkImage       depthImage;
-    VmaAllocation depthImageAllocation;
-    VkImageView   depthImageView;
+    // screen buffer
+    PNSLR_ArraySlice(VkImage)       screenImages;
+    PNSLR_ArraySlice(VmaAllocation) screenImageAllocations;
+    PNSLR_ArraySlice(VkImageView)   screenImageViews;
 
-    // shaders
-    VkPipeline trianglePipeline;
+    // depth stuff
+    PNSLR_ArraySlice(VkImage)       depthImages;
+    PNSLR_ArraySlice(VmaAllocation) depthImageAllocations;
+    PNSLR_ArraySlice(VkImageView)   depthImageViews;
 
     // swapchain and related
     VkSwapchainKHR                swapchain;
@@ -85,6 +90,10 @@ typedef struct MZNT_VulkanRendererSurface
     PNSLR_ArraySlice(VkSemaphore)    presentCompleteSemaphores;
     PNSLR_ArraySlice(VkSemaphore)    renderFinishedSemaphores;
     PNSLR_ArraySlice(VkFence)        inFlightFences;
+
+    // shaders
+    MZNT_VulkanShader finalBlitShader;
+    VkSampler         finalBlitSampler;
 } MZNT_VulkanRendererSurface;
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
