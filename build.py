@@ -59,10 +59,14 @@ MAIN_FILE_C   = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.c'
 MAIN_FILE_CXX = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.cpp'
 
 TRIANGLE_SLANG_FILE        = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle.slang'
-TRIANGLE_SPIRV_FILE        = FOLDER_STRUCTURE.tmpDir + 'Shaders/triangle.spv'
 TRIANGLE_SPIRV_SRC_FILE    = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_spv.c'
 TRIANGLE_DXIL_VS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_dxil_vs.c'
 TRIANGLE_DXIL_PS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_dxil_ps.c'
+
+FULLSCREENBLIT_SLANG_FILE        = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit.slang'
+FULLSCREENBLIT_SPIRV_SRC_FILE    = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_spv.c'
+FULLSCREENBLIT_DXIL_VS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_dxil_vs.c'
+FULLSCREENBLIT_DXIL_PS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_dxil_ps.c'
 
 def recompileShaders() -> bool:
     success = True
@@ -74,6 +78,15 @@ def recompileShaders() -> bool:
         success = False
 
     if not compileShader(SHADER_COMPILE_MODE_DX12_PS, TRIANGLE_SLANG_FILE, ['fragMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_DXIL_PS_SRC_FILE):
+        success = False
+
+    if not compileShader(SHADER_COMPILE_MODE_VK, FULLSCREENBLIT_SLANG_FILE, ['vertMain', 'fragMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_SPIRV_SRC_FILE):
+        success = False
+
+    if not compileShader(SHADER_COMPILE_MODE_DX12_VS, FULLSCREENBLIT_SLANG_FILE, ['vertMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_DXIL_VS_SRC_FILE):
+        success = False
+
+    if not compileShader(SHADER_COMPILE_MODE_DX12_PS, FULLSCREENBLIT_SLANG_FILE, ['fragMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_DXIL_PS_SRC_FILE):
         success = False
 
     return success

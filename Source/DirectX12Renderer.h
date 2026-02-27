@@ -52,8 +52,10 @@ typedef struct MZNT_DirectX12RendererSurface
 
     // screen buffer
     ID3D12Resource*       screenBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
-    ID3D12DescriptorHeap* svHeap;
-    UINT                  svDescriptorSize;
+    ID3D12DescriptorHeap* svRtvHeap;
+    UINT                  svRtvDescriptorSize;
+    ID3D12DescriptorHeap* svSrvHeap;
+    UINT                  svSrvDescriptorSize;
 
     // depth
     ID3D12Resource*       depthBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
@@ -69,6 +71,9 @@ typedef struct MZNT_DirectX12RendererSurface
     UINT64       frameFenceValues[MZNT_NUM_FRAMES_IN_FLIGHT];
     UINT64       nextFenceValue;
     HANDLE       fenceEvent;
+
+    // shaders
+    MZNT_DirectX12Shader finalBlitShader;
 } MZNT_DirectX12RendererSurface;
 
 MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);

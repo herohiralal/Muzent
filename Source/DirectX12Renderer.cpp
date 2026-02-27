@@ -10,6 +10,14 @@
 #include "Shaders/triangle_dxil_ps.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_FullscreenBlitShaderVS
+#include "Shaders/fullscreenBlit_dxil_vs.c"
+#undef INLINED_FILE_INCLUSION_NAME
+
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_FullscreenBlitShaderPS
+#include "Shaders/fullscreenBlit_dxil_ps.c"
+#undef INLINED_FILE_INCLUSION_NAME
+
 static inline D3D12MA::Allocator*& MZNT_Internal_GetAllocator(MZNT_DirectX12Renderer* renderer) { return (D3D12MA::Allocator*&) renderer->memoryAllocator; }
 
 static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
@@ -18,21 +26,21 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
     utf8str message = {0};
     switch (result)
     {
-        case D3D12_ERROR_ADAPTER_NOT_FOUND: message = Panshilar::StringLiteral("The specified cached PSO was created on a different adapter and cannot be reused on the current adapter."); break;
-        case D3D12_ERROR_DRIVER_VERSION_MISMATCH: message = Panshilar::StringLiteral("The specified cached PSO was created on a different driver version and cannot be reused on the current adapter."); break;
-        case DXGI_ERROR_INVALID_CALL: message = Panshilar::StringLiteral("The method call is invalid. For example, a method's parameter may not be a valid pointer."); break;
-        case DXGI_ERROR_WAS_STILL_DRAWING: message = Panshilar::StringLiteral("The previous blit operation that is transferring information to or from this surface is incomplete."); break;
-        case E_FAIL: message = Panshilar::StringLiteral("Attempted to create a device with the debug layer enabled and the layer is not installed."); break;
-        case E_INVALIDARG: message = Panshilar::StringLiteral("An invalid parameter was passed to the returning function."); break;
-        case E_OUTOFMEMORY: message = Panshilar::StringLiteral("Direct3D could not allocate sufficient memory to complete the call."); break;
-        case E_NOTIMPL: message = Panshilar::StringLiteral("The method call isn't implemented with the passed parameter combination."); break;
-        case S_FALSE: message = Panshilar::StringLiteral("Alternate success value, indicating a successful but nonstandard completion (the precise meaning depends on context)."); break;
-        default: message = Panshilar::StringLiteral("An unknown error occurred."); break;
+        case D3D12_ERROR_ADAPTER_NOT_FOUND: message = Panshilar::StringLiteral("\"The specified cached PSO was created on a different adapter and cannot be reused on the current adapter.\""); break;
+        case D3D12_ERROR_DRIVER_VERSION_MISMATCH: message = Panshilar::StringLiteral("\"The specified cached PSO was created on a different driver version and cannot be reused on the current adapter.\""); break;
+        case DXGI_ERROR_INVALID_CALL: message = Panshilar::StringLiteral("\"The method call is invalid. For example, a method's parameter may not be a valid pointer.\""); break;
+        case DXGI_ERROR_WAS_STILL_DRAWING: message = Panshilar::StringLiteral("\"The previous blit operation that is transferring information to or from this surface is incomplete.\""); break;
+        case E_FAIL: message = Panshilar::StringLiteral("\"Attempted to create a device with the debug layer enabled and the layer is not installed.\""); break;
+        case E_INVALIDARG: message = Panshilar::StringLiteral("\"An invalid parameter was passed to the returning function.\""); break;
+        case E_OUTOFMEMORY: message = Panshilar::StringLiteral("\"Direct3D could not allocate sufficient memory to complete the call.\""); break;
+        case E_NOTIMPL: message = Panshilar::StringLiteral("\"The method call isn't implemented with the passed parameter combination.\""); break;
+        case S_FALSE: message = Panshilar::StringLiteral("\"Alternate success value, indicating a successful but nonstandard completion (the precise meaning depends on context).\""); break;
+        default: message = Panshilar::StringLiteral("\"An unknown error occurred.\""); break;
     }
 
     if (result != S_OK)
     {
-        PNSLR_LogEf(Panshilar::StringLiteral("DirectX 12 error: $ from $"),
+        PNSLR_LogEf(Panshilar::StringLiteral("DirectX 12 error: $ from $."),
                     PNSLR_FmtArgs(
                         PNSLR_FmtString(message),
                         PNSLR_FmtString(fnCall)
@@ -43,8 +51,35 @@ static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str 
     }
 }
 
+static inline void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR_SourceCodeLocation loc)
+{
+    if (!blob) return;
+
+    utf8str blobMsg = { };
+    blobMsg.data  = (u8*) blob->GetBufferPointer();
+    blobMsg.count = (i64) blob->GetBufferSize();
+
+    if (blobMsg.data && blobMsg.data[blobMsg.count - 1] == '\0')
+    {
+        // trim null terminator from message for cleaner logging
+        blobMsg.count -= 1;
+    }
+
+    PNSLR_LogEf(Panshilar::StringLiteral("[$]: $"),
+                PNSLR_FmtArgs(
+                    PNSLR_FmtString(objName),
+                    PNSLR_FmtString(blobMsg)
+                ),
+                loc);
+
+    blob->Release();
+}
+
 #define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
     MZNT_Internal_LogDx12ResultOnFailure((call), Panshilar::StringLiteral(#call), PNSLR_GET_LOC())
+
+#define MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(blob) \
+    MZNT_Internal_LogErrorBlobAndRelease((blob), Panshilar::StringLiteral(#blob), PNSLR_GET_LOC())
 
 static const DXGI_FORMAT k_MZNT_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
@@ -134,8 +169,16 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             rootDesc.Desc_1_0.Flags             = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
             ID3DBlob* serializedDesc = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, nil));
-            MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateRootSignature(0, serializedDesc->GetBufferPointer(), serializedDesc->GetBufferSize(), IID_PPV_ARGS(&(output->triangleShader.rootSignature))));
+            ID3DBlob* errorBlob = nil;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, &errorBlob));
+            MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(errorBlob);
+            MZNT_INTERNAL_DX12_CHECKED_CALL(
+                output->device->CreateRootSignature(
+                    0,
+                    serializedDesc->GetBufferPointer(),
+                    serializedDesc->GetBufferSize(),
+                    IID_PPV_ARGS(&(output->triangleShader.rootSignature))
+                ));
             serializedDesc->Release();
         }
 
@@ -266,25 +309,42 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
                 &heapProps,
                 D3D12_HEAP_FLAG_NONE,
                 &colourDesc,
-                D3D12_RESOURCE_STATE_COPY_SOURCE,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
                 &colourClearValue,
                 IID_PPV_ARGS(&(surface->screenBuffer[i]))
             ));
         }
     }
 
-    // screen buffer views
+    // screen buffer rt views
     {
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = { };
         rtvDesc.Format             = k_MZNT_Internal_PreferredColourAttchFormat;
         rtvDesc.ViewDimension      = D3D12_RTV_DIMENSION_TEXTURE2D;
         rtvDesc.Texture2D.MipSlice = 0;
 
-        D3D12_CPU_DESCRIPTOR_HANDLE svHandle = surface->svHeap->GetCPUDescriptorHandleForHeapStart();
+        D3D12_CPU_DESCRIPTOR_HANDLE svHandle = surface->svRtvHeap->GetCPUDescriptorHandleForHeapStart();
         for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
             surface->renderer->device->CreateRenderTargetView(surface->screenBuffer[i], &rtvDesc, svHandle);
-            svHandle.ptr += surface->svDescriptorSize;
+            svHandle.ptr += surface->svRtvDescriptorSize;
+        }
+    }
+
+    // screen buffer sr views
+    {
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = { };
+        srvDesc.Format                    = k_MZNT_Internal_PreferredColourAttchFormat;
+        srvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels       = 1;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE svHandle = surface->svSrvHeap->GetCPUDescriptorHandleForHeapStart();
+        for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
+        {
+            surface->renderer->device->CreateShaderResourceView(surface->screenBuffer[i], &srvDesc, svHandle);
+            svHandle.ptr += surface->svSrvDescriptorSize;
         }
     }
 
@@ -394,9 +454,20 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
         heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         heapDesc.NumDescriptors = MZNT_NUM_FRAMES_IN_FLIGHT;
         heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&(output->svHeap))));
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&(output->svRtvHeap))));
 
-        output->svDescriptorSize = renderer->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        output->svRtvDescriptorSize = renderer->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    }
+
+    // screenbuffer srv heap
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC heapDesc = { };
+        heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        heapDesc.NumDescriptors = MZNT_NUM_FRAMES_IN_FLIGHT;
+        heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&(output->svSrvHeap))));
+
+        output->svSrvDescriptorSize = renderer->device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     // dsv heap
@@ -434,6 +505,85 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
     // frame idx
     output->curFrame = output->swapchain->GetCurrentBackBufferIndex();
 
+    // fullscreen blit shader
+    {
+        // root signature
+        {
+            D3D12_DESCRIPTOR_RANGE srcRange = { };
+            srcRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+            srcRange.NumDescriptors                    = 1;
+            srcRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+            D3D12_ROOT_PARAMETER srcParam = { };
+            srcParam.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            srcParam.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
+            srcParam.DescriptorTable.NumDescriptorRanges = 1;
+            srcParam.DescriptorTable.pDescriptorRanges   = &srcRange;
+
+            D3D12_STATIC_SAMPLER_DESC linearSampler = { };
+            linearSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+            linearSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            linearSampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            linearSampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            linearSampler.BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+            linearSampler.MaxAnisotropy    = 1;
+            linearSampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_ALWAYS;
+            linearSampler.MaxLOD           = D3D12_FLOAT32_MAX;
+            linearSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+            D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = { };
+            rootDesc.Version                    = D3D_ROOT_SIGNATURE_VERSION_1_0;
+            rootDesc.Desc_1_0.NumParameters     = 1;
+            rootDesc.Desc_1_0.pParameters       = &srcParam;
+            rootDesc.Desc_1_0.NumStaticSamplers = 1;
+            rootDesc.Desc_1_0.pStaticSamplers   = &linearSampler;
+            rootDesc.Desc_1_0.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+
+            ID3DBlob* serializedDesc = nil;
+            ID3DBlob* errorBlob = nil;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, &errorBlob));
+            MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(errorBlob);
+            MZNT_INTERNAL_DX12_CHECKED_CALL(
+                renderer->device->CreateRootSignature(
+                    0,
+                    serializedDesc->GetBufferPointer(),
+                    serializedDesc->GetBufferSize(),
+                    IID_PPV_ARGS(&(output->finalBlitShader.rootSignature))
+                ));
+            serializedDesc->Release();
+        }
+
+        // pso
+        {
+            D3D12_INPUT_LAYOUT_DESC inputLayout = { };
+            inputLayout.pInputElementDescs = nil;
+            inputLayout.NumElements        = 0;
+
+            D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
+            psoDesc.pRootSignature                  = output->finalBlitShader.rootSignature;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_FullscreenBlitShaderVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_FullscreenBlitShaderVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_FullscreenBlitShaderPSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_FullscreenBlitShaderPSSize;
+            psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
+            psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
+            psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            psoDesc.RTVFormats[0]                   = output->swapchainFormat;
+            psoDesc.NumRenderTargets                = 1;
+            psoDesc.SampleDesc.Count                = 1;
+            psoDesc.SampleMask                      = UINT_MAX;
+            psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+            psoDesc.RasterizerState.CullMode        = D3D12_CULL_MODE_NONE;
+            psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+            psoDesc.DepthStencilState               = D3D12_DEPTH_STENCIL_DESC();
+            psoDesc.DepthStencilState.DepthEnable   = false;
+            psoDesc.DepthStencilState.StencilEnable = false;
+            psoDesc.DSVFormat                       = DXGI_FORMAT_UNKNOWN;
+
+            MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->finalBlitShader.pipelineState))));
+        }
+    }
+
     return output;
 }
 
@@ -442,6 +592,9 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     if (!surface) return false;
 
     MZNT_Internal_WaitForDx12GPUToBeIdle(surface);
+
+    surface->finalBlitShader.pipelineState->Release();
+    surface->finalBlitShader.rootSignature->Release();
 
     // destroy command allocators & command lists
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
@@ -467,7 +620,8 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     {
         surface->screenBuffer[i]->Release();
     }
-    surface->svHeap->Release();
+    surface->svSrvHeap->Release();
+    surface->svRtvHeap->Release();
 
     // swapchain
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
@@ -531,20 +685,10 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
     cmdBuffer.cmdAllocator->Reset();
     cmdBuffer.cmdList->Reset(cmdBuffer.cmdAllocator, nil);
 
-    // transition screen buffer to render target
-    {
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            surface->screenBuffer[surface->curFrame],
-            D3D12_RESOURCE_STATE_COPY_SOURCE,
-            D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
-    }
-
     // bind screen buffer and depth buffer
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->svHeap->GetCPUDescriptorHandleForHeapStart(); // if you store the RTVs
-        rtv.ptr += surface->curFrame * surface->svDescriptorSize;
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->svRtvHeap->GetCPUDescriptorHandleForHeapStart(); // if you store the RTVs
+        rtv.ptr += surface->curFrame * surface->svRtvDescriptorSize;
 
         D3D12_CPU_DESCRIPTOR_HANDLE dsv = surface->dsvHeap->GetCPUDescriptorHandleForHeapStart();
         dsv.ptr += surface->curFrame * surface->dsvDescriptorSize;
@@ -585,37 +729,62 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
 
     MZNT_DirectX12RendererCommandBuffer& cmdBuffer = surface->commandBuffers[surface->curFrame];
 
-    // transition screen buffer to copy source
+    // screenbuffer: rt -> srv, swapchain: present -> rt
     {
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        D3D12_RESOURCE_BARRIER barriers[2] = { };
+
+        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
             surface->screenBuffer[surface->curFrame],
             D3D12_RESOURCE_STATE_RENDER_TARGET,
-            D3D12_RESOURCE_STATE_COPY_SOURCE);
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
-    }
-
-    // transition swapchain buffer to copy dest
-    {
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
             surface->swapchainRTs[surface->curFrame],
             D3D12_RESOURCE_STATE_PRESENT,
-            D3D12_RESOURCE_STATE_COPY_DEST);
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
+        cmdBuffer.cmdList->ResourceBarrier(2, barriers);
     }
 
-    // blit screenbuffer to swapchain
-    cmdBuffer.cmdList->CopyResource(surface->swapchainRTs[surface->curFrame], surface->screenBuffer[surface->curFrame]);
-
-    // transition swapchain buffer to present
+    // bind screen buffer and depth buffer
     {
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->swapchainRtvHeap->GetCPUDescriptorHandleForHeapStart(); // if you store the RTVs
+        rtv.ptr += surface->curFrame * surface->swapchainRtvDescriptorSize;
+
+        cmdBuffer.cmdList->OMSetRenderTargets(1, &rtv, FALSE, nil);
+    }
+
+    // cant do a copy texture, because the outputs are in different formats, so do a fullscreen blit instead
+    {
+        cmdBuffer.cmdList->SetPipelineState(surface->finalBlitShader.pipelineState);
+        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->finalBlitShader.rootSignature);
+
+        cmdBuffer.cmdList->SetDescriptorHeaps(1, &surface->svSrvHeap);
+
+        D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = surface->svSrvHeap->GetGPUDescriptorHandleForHeapStart();
+        srvHandle.ptr += surface->curFrame * surface->svSrvDescriptorSize;
+        cmdBuffer.cmdList->SetGraphicsRootDescriptorTable(0, srvHandle);
+        cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
+        cmdBuffer.cmdList->IASetIndexBuffer(nil);
+        cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
+    }
+
+    // screenbuffer: srv -> rt, swapchain: rt -> present
+    {
+        D3D12_RESOURCE_BARRIER barriers[2] = { };
+
+        barriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(
+            surface->screenBuffer[surface->curFrame],
+            D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+            D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+        barriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
             surface->swapchainRTs[surface->curFrame],
-            D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
             D3D12_RESOURCE_STATE_PRESENT);
 
-        cmdBuffer.cmdList->ResourceBarrier(1, &barrier);
+        cmdBuffer.cmdList->ResourceBarrier(2, barriers);
     }
 
     cmdBuffer.cmdList->Close();
