@@ -2,8 +2,12 @@
 #include "VulkanRenderer.h"
 #if MZNT_VULKAN
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_TriangleShader
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkTriangleShader
 #include "Shaders/triangle_spv.c"
+#undef INLINED_FILE_INCLUSION_NAME
+
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullscreenBlitShader
+#include "Shaders/fullscreenBlit_spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
@@ -538,14 +542,14 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
         {
             .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = (size_t) k_MZNT_Internal_TriangleShaderSize,
-            .pCode    = (u32*)   k_MZNT_Internal_TriangleShaderContents,
+            .codeSize = (size_t) k_MZNT_Internal_VkTriangleShaderSize,
+            .pCode    = (u32*)   k_MZNT_Internal_VkTriangleShaderContents,
         }, nil, &output->triangleShader.module));
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &(VkPipelineLayoutCreateInfo)
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        }, nil, &output->triangleShader.layout));
+        }, nil, &output->triangleShader.pipelineLayout));
 
         VkPipelineShaderStageCreateInfo triangleShaderStages[] = {
             {
@@ -621,7 +625,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
                 .pDynamicStates          = dynamicStates,
             },
-            .layout                      = output->triangleShader.layout,
+            .layout                      = output->triangleShader.pipelineLayout,
             .renderPass                  = VK_NULL_HANDLE,
             .pNext                       = &(VkPipelineRenderingCreateInfo)
             {
@@ -644,7 +648,7 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
 
     vkDestroyPipeline(renderer->device, renderer->triangleShader.pipeline, nil);
-    vkDestroyPipelineLayout(renderer->device, renderer->triangleShader.layout, nil);
+    vkDestroyPipelineLayout(renderer->device, renderer->triangleShader.pipelineLayout, nil);
     vkDestroyShaderModule(renderer->device, renderer->triangleShader.module, nil);
 
     vmaDestroyAllocator(renderer->vmaAllocator);
@@ -996,6 +1000,145 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
     }
 
+    // final blit shader pipeline
+    {
+        // TODO: replace with immutable sampler thing
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSampler(renderer->device, &(VkSamplerCreateInfo)
+        {
+            .sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            .magFilter    = VK_FILTER_LINEAR,
+            .minFilter    = VK_FILTER_LINEAR,
+            .mipmapMode   = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .maxAnisotropy = 1.0f,
+            .maxLod       = VK_LOD_CLAMP_NONE,
+        }, nil, &(output->finalBlitSampler)));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(renderer->device, &(VkShaderModuleCreateInfo)
+        {
+            .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = (size_t) k_MZNT_Internal_VkFullscreenBlitShaderSize,
+            .pCode    = (u32*)   k_MZNT_Internal_VkFullscreenBlitShaderContents,
+        }, nil, &output->finalBlitShader.module));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDescriptorSetLayout(renderer->device, &(VkDescriptorSetLayoutCreateInfo)
+        {
+            .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings    = (VkDescriptorSetLayoutBinding[])
+            {
+                {
+                    .binding            = 0,
+                    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount    = 1,
+                    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pImmutableSamplers = nil,
+                },
+            }
+        }, nil, &output->finalBlitShader.descriptorSetLayout));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(renderer->device, &(VkPipelineLayoutCreateInfo)
+        {
+            .sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+            .setLayoutCount = 1,
+            .pSetLayouts    = &output->finalBlitShader.descriptorSetLayout,
+        }, nil, &output->finalBlitShader.pipelineLayout));
+
+        VkPipelineShaderStageCreateInfo finalBlitShaderStages[] = {
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_VERTEX_BIT,
+                .module = output->finalBlitShader.module,
+                .pName  = "vertMain",
+            },
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = output->finalBlitShader.module,
+                .pName  = "fragMain",
+            },
+        };
+
+        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(renderer->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
+        {
+            .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .stageCount                  = sizeof(finalBlitShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages                     = finalBlitShaderStages,
+            .pVertexInputState           = &(VkPipelineVertexInputStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            },
+            .pInputAssemblyState         = &(VkPipelineInputAssemblyStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                .topology                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            },
+            .pViewportState              = &(VkPipelineViewportStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                .viewportCount           = 1,
+                .scissorCount            = 1,
+            },
+            .pRasterizationState         = &(VkPipelineRasterizationStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                .depthClampEnable        = VK_FALSE,
+                .rasterizerDiscardEnable = VK_FALSE,
+                .polygonMode             = VK_POLYGON_MODE_FILL,
+                .cullMode                = VK_CULL_MODE_BACK_BIT,
+                .frontFace               = VK_FRONT_FACE_CLOCKWISE,
+                .depthBiasEnable         = VK_FALSE,
+                .depthBiasSlopeFactor    = 1.0f,
+                .lineWidth               = 1.0f,
+            },
+            .pMultisampleState           = &(VkPipelineMultisampleStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                .rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT,
+            },
+            .pColorBlendState            = &(VkPipelineColorBlendStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                .logicOpEnable           = VK_FALSE,
+                .logicOp                 = VK_LOGIC_OP_COPY,
+                .attachmentCount         = 1,
+                .pAttachments            = &(VkPipelineColorBlendAttachmentState)
+                {
+                    .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT |
+                                           VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT |
+                                           VK_COLOR_COMPONENT_A_BIT,
+                },
+            },
+            .pDepthStencilState          = &(VkPipelineDepthStencilStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                .depthTestEnable         = VK_FALSE,
+                .depthWriteEnable        = VK_FALSE,
+            },
+            .pDynamicState               = &(VkPipelineDynamicStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
+                .pDynamicStates          = dynamicStates,
+            },
+            .layout                      = output->finalBlitShader.pipelineLayout,
+            .renderPass                  = VK_NULL_HANDLE,
+            .pNext                       = &(VkPipelineRenderingCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .colorAttachmentCount    = 1,
+                .pColorAttachmentFormats = &output->swapchainImageFormat.format,
+                .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
+                .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+            },
+        }, nil, &output->finalBlitShader.pipeline));
+    }
+
     return output;
 }
 
@@ -1005,6 +1148,12 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     if (!surface->renderer) FORCE_DBG_TRAP;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+
+    vkDestroyPipeline(surface->renderer->device, surface->finalBlitShader.pipeline, nil);
+    vkDestroyPipelineLayout(surface->renderer->device, surface->finalBlitShader.pipelineLayout, nil);
+    vkDestroyDescriptorSetLayout(surface->renderer->device, surface->finalBlitShader.descriptorSetLayout, nil);
+    vkDestroyShaderModule(surface->renderer->device, surface->finalBlitShader.module, nil);
+    vkDestroySampler(surface->renderer->device, surface->finalBlitSampler, nil);
 
     i64 imgCount = surface->swapchainImages.count;
     for (i32 i = 0; i < imgCount; i++)
@@ -1160,7 +1309,7 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
     // draw triangle
     {
         // bind shader
-        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->trianglePipeline);
+        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->triangleShader.pipeline);
 
         // set viewport
         vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)

@@ -600,7 +600,6 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
             psoDesc.SampleDesc.Count                = 1;
             psoDesc.SampleMask                      = UINT_MAX;
             psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoDesc.RasterizerState.CullMode        = D3D12_CULL_MODE_NONE;
             psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
             psoDesc.DepthStencilState               = D3D12_DEPTH_STENCIL_DESC();
             psoDesc.DepthStencilState.DepthEnable   = false;
@@ -744,6 +743,8 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
     cmdBuffer.cmdList->SetPipelineState(surface->renderer->triangleShader.pipelineState);
     cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->triangleShader.rootSignature);
     cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
+    cmdBuffer.cmdList->IASetIndexBuffer(nil);
     cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
 
     return &cmdBuffer;

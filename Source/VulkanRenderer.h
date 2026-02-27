@@ -22,9 +22,10 @@ PNSLR_DECLARE_ARRAY_SLICE(VmaAllocation);
 
 typedef struct MZNT_VulkanShader
 {
-    VkShaderModule   module;
-    VkPipelineLayout layout;
-    VkPipeline       pipeline;
+    VkShaderModule        module;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkPipelineLayout      pipelineLayout;
+    VkPipeline            pipeline;
 } MZNT_VulkanShader;
 
 typedef struct MZNT_VulkanRenderer
