@@ -711,6 +711,20 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
     cmdBuffer.cmdAllocator->Reset();
     cmdBuffer.cmdList->Reset(cmdBuffer.cmdAllocator, nil);
 
+    // viewport & scissor
+    {
+        D3D12_VIEWPORT vp = { };
+        vp.Width  = (float) surface->swapchainWidth;
+        vp.Height = (float) surface->swapchainHeight;
+        vp.MaxDepth = 1.0f;
+        cmdBuffer.cmdList->RSSetViewports(1, &vp);
+
+        D3D12_RECT scissor = { };
+        scissor.right  = (LONG) surface->swapchainWidth;
+        scissor.bottom = (LONG) surface->swapchainHeight;
+        cmdBuffer.cmdList->RSSetScissorRects(1, &scissor);
+    }
+
     // bind screen buffer and depth buffer
     {
         D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->svRtvHeap->GetCPUDescriptorHandleForHeapStart(); // if you store the RTVs
@@ -726,26 +740,15 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
         cmdBuffer.cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
 
-    // viewport & scissor
+    // draw triangle
     {
-        D3D12_VIEWPORT vp = { };
-        vp.Width  = (float) surface->swapchainWidth;
-        vp.Height = (float) surface->swapchainHeight;
-        vp.MaxDepth = 1.0f;
-        cmdBuffer.cmdList->RSSetViewports(1, &vp);
-
-        D3D12_RECT scissor = { };
-        scissor.right  = (LONG) surface->swapchainWidth;
-        scissor.bottom = (LONG) surface->swapchainHeight;
-        cmdBuffer.cmdList->RSSetScissorRects(1, &scissor);
+        cmdBuffer.cmdList->SetPipelineState(surface->renderer->triangleShader.pipelineState);
+        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->triangleShader.rootSignature);
+        cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
+        cmdBuffer.cmdList->IASetIndexBuffer(nil);
+        cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
     }
-
-    cmdBuffer.cmdList->SetPipelineState(surface->renderer->triangleShader.pipelineState);
-    cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->triangleShader.rootSignature);
-    cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
-    cmdBuffer.cmdList->IASetIndexBuffer(nil);
-    cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
 
     return &cmdBuffer;
 }
@@ -774,7 +777,7 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
         cmdBuffer.cmdList->ResourceBarrier(2, barriers);
     }
 
-    // bind screen buffer and depth buffer
+    // bind swapchain to output
     {
         D3D12_CPU_DESCRIPTOR_HANDLE rtv = surface->swapchainRtvHeap->GetCPUDescriptorHandleForHeapStart(); // if you store the RTVs
         rtv.ptr += surface->curFrame * surface->swapchainRtvDescriptorSize;

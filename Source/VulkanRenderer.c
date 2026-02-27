@@ -1262,33 +1262,19 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
     }));
 
-    // transition swapchain image to color attachment optimal
-    vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
+    // viewport and scissor
     {
-        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers    = &(VkImageMemoryBarrier2)
+        vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
         {
-            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
-            .srcAccessMask       = 0,
-            .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
-            .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
-            .subresourceRange    =
-            {
-                .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel    = 0,
-                .levelCount      = 1,
-                .baseArrayLayer  = 0,
-                .layerCount      = 1,
-            },
-        }
-    });
+            .width    = (f32) surface->swapchainExtent.width,
+            .height   = (f32) surface->swapchainExtent.height,
+            .maxDepth = 1.0f,
+        });
 
-    // begin rendering
+        vkCmdSetScissor(cmdBuf->cmdBuffer, 0, 1, &(VkRect2D) {.extent = surface->swapchainExtent});
+    }
+
+    // bind screen buffer and depth buffer
     vkCmdBeginRendering(cmdBuf->cmdBuffer, &(VkRenderingInfo)
     {
         .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
@@ -1298,31 +1284,22 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         .pColorAttachments = &(VkRenderingAttachmentInfo)
         {
             .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-            .imageView   = surface->swapchainImageViews.data[surface->curSwpchImgIdx],
+            .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
             .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
             .loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
             .clearValue  = {.color = {.float32 = {r, g, b, a}}},
         },
+        // TODO: bind
+        .pDepthAttachment = nil,
+        .pStencilAttachment = nil,
     });
 
     // draw triangle
     {
-        // bind shader
         vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->triangleShader.pipeline);
-
-        // set viewport
-        vkCmdSetViewport(cmdBuf->cmdBuffer, 0, 1, &(VkViewport)
-        {
-            .x        = 0.0f,                                    .y        = 0.0f,
-            .width    = (f32) surface->swapchainExtent.width,    .height   = (f32) surface->swapchainExtent.height,
-            .minDepth = 0.0f,                                    .maxDepth = 1.0f,
-        });
-
-        // set scissor
-        vkCmdSetScissor(cmdBuf->cmdBuffer, 0, 1, &(VkRect2D){.offset = {0, 0}, .extent = surface->swapchainExtent});
-
-        // draw
+        vkCmdBindVertexBuffers2(cmdBuf->cmdBuffer, 0, 0, nil, nil, nil, nil);
+        vkCmdBindIndexBuffer2(cmdBuf->cmdBuffer, nil, 0, 0, VK_INDEX_TYPE_UINT16);
         vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
     }
 
@@ -1333,31 +1310,146 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
 {
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(surface->commandBuffers[surface->curFrame]);
 
-    // finish rendering
     vkCmdEndRendering(cmdBuf->cmdBuffer);
 
-    // transition swapchain image to present
+    // screenbuffer: rt -> srv, swapchain: present -> rt
     vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
     {
         .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers    = &(VkImageMemoryBarrier2)
+        .imageMemoryBarrierCount = 2,
+        .pImageMemoryBarriers    = (VkImageMemoryBarrier2[])
         {
-            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
-            .dstAccessMask       = 0,
-            .oldLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
-            .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
-            .subresourceRange    =
             {
-                .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel    = 0,
-                .levelCount      = 1,
-                .baseArrayLayer  = 0,
-                .layerCount      = 1,
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .dstAccessMask       = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .image               = surface->screenImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
+            },
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .srcAccessMask       = VK_ACCESS_2_NONE,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
+            },
+        }
+    });
+
+    // bind swapchain to output
+    vkCmdBeginRendering(cmdBuf->cmdBuffer, &(VkRenderingInfo)
+    {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .renderArea = {.offset = {0, 0}, .extent = surface->swapchainExtent},
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &(VkRenderingAttachmentInfo)
+        {
+            .sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+            .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
+            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+            .loadOp      = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .storeOp     = VK_ATTACHMENT_STORE_OP_STORE,
+        },
+        // TODO: bind
+        .pDepthAttachment = nil,
+        .pStencilAttachment = nil,
+    });
+
+    // copy screen buffer to swapchain buffer
+    {
+        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipeline);
+
+        VkDescriptorSet descriptorSet = nil;
+        vkUpdateDescriptorSets(surface->renderer->device, 1, &(VkWriteDescriptorSet)
+        {
+            .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet          = descriptorSet,
+            .dstBinding      = 0,
+            .descriptorCount = 1,
+            .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo      = &(VkDescriptorImageInfo)
+            {
+                .sampler     = surface->finalBlitSampler,
+                .imageView   = surface->screenImageViews.data[surface->curSwpchImgIdx],
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            },
+        }, 0, nil);
+
+        vkCmdBindDescriptorSets(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipelineLayout,
+            0, 1, &descriptorSet, 0, nil);
+
+        vkCmdBindVertexBuffers2(cmdBuf->cmdBuffer, 0, 0, nil, nil, nil, nil);
+        vkCmdBindIndexBuffer2(cmdBuf->cmdBuffer, nil, 0, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
+    }
+
+    vkCmdEndRendering(cmdBuf->cmdBuffer);
+
+    // screenbuffer: srv -> rt, swapchain: rt -> present
+    vkCmdPipelineBarrier2(cmdBuf->cmdBuffer, &(VkDependencyInfo)
+    {
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 2,
+        .pImageMemoryBarriers    = (VkImageMemoryBarrier2[])
+        {
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .image               = surface->screenImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
+            },
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .dstAccessMask       = VK_ACCESS_2_NONE,
+                .oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .image               = surface->swapchainImages.data[surface->curSwpchImgIdx],
+                .subresourceRange    =
+                {
+                    .aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel    = 0,
+                    .levelCount      = 1,
+                    .baseArrayLayer  = 0,
+                    .layerCount      = 1,
+                },
             },
         }
     });
