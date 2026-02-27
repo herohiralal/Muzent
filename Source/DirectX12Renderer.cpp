@@ -81,8 +81,8 @@ static inline void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str 
 #define MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(blob) \
     MZNT_Internal_LogErrorBlobAndRelease((blob), Panshilar::StringLiteral(#blob), PNSLR_GET_LOC())
 
-static const DXGI_FORMAT k_MZNT_Internal_PreferredColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
-static const DXGI_FORMAT k_MZNT_Internal_PreferredDepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12ColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
+static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12DepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
@@ -197,14 +197,14 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                   = k_MZNT_Internal_PreferredColourAttchFormat;
+            psoDesc.RTVFormats[0]                   = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
             psoDesc.NumRenderTargets                = 1;
             psoDesc.SampleDesc.Count                = 1;
             psoDesc.SampleMask                      = UINT_MAX;
             psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
             psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
             psoDesc.DepthStencilState               = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-            psoDesc.DSVFormat                       = k_MZNT_Internal_PreferredDepthAttchFormat;
+            psoDesc.DSVFormat                       = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
 
             MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->triangleShader.pipelineState))));
         }
@@ -290,12 +290,12 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         colourDesc.Height           = surface->swapchainHeight;
         colourDesc.DepthOrArraySize = 1;
         colourDesc.MipLevels        = 1;
-        colourDesc.Format           = k_MZNT_Internal_PreferredColourAttchFormat;
+        colourDesc.Format           = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
         colourDesc.SampleDesc.Count = 1;
         colourDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
         D3D12_CLEAR_VALUE colourClearValue = { };
-        colourClearValue.Format   = k_MZNT_Internal_PreferredColourAttchFormat;
+        colourClearValue.Format   = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
         colourClearValue.Color[0] = 0.0f;
         colourClearValue.Color[1] = 0.0f;
         colourClearValue.Color[2] = 0.0f;
@@ -319,7 +319,7 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
     // screen buffer rt views
     {
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = { };
-        rtvDesc.Format             = k_MZNT_Internal_PreferredColourAttchFormat;
+        rtvDesc.Format             = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
         rtvDesc.ViewDimension      = D3D12_RTV_DIMENSION_TEXTURE2D;
         rtvDesc.Texture2D.MipSlice = 0;
 
@@ -334,7 +334,7 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
     // screen buffer sr views
     {
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = { };
-        srvDesc.Format                    = k_MZNT_Internal_PreferredColourAttchFormat;
+        srvDesc.Format                    = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
         srvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
         srvDesc.Texture2D.MipLevels       = 1;
@@ -356,12 +356,12 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         depthDesc.Height           = surface->swapchainHeight;
         depthDesc.DepthOrArraySize = 1;
         depthDesc.MipLevels        = 1;
-        depthDesc.Format           = k_MZNT_Internal_PreferredDepthAttchFormat;
+        depthDesc.Format           = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
         depthDesc.SampleDesc.Count = 1;
         depthDesc.Flags            = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
         D3D12_CLEAR_VALUE depthClearValue = { };
-        depthClearValue.Format             = k_MZNT_Internal_PreferredDepthAttchFormat;
+        depthClearValue.Format             = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
         depthClearValue.DepthStencil.Depth = 1.0f; // stencil is 0-init
 
         D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -382,7 +382,7 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
     // depth stencil views
     {
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = { };
-        dsvDesc.Format             = k_MZNT_Internal_PreferredDepthAttchFormat;
+        dsvDesc.Format             = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
         dsvDesc.ViewDimension      = D3D12_DSV_DIMENSION_TEXTURE2D;
         dsvDesc.Texture2D.MipSlice = 0;
 

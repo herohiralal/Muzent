@@ -185,8 +185,8 @@ PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(Vk
     return queueCreateInfos;
 }
 
-static const VkFormat k_MZNT_Internal_PreferredColourAttchFormat  = VK_FORMAT_R16G16B16A16_SFLOAT;
-static const VkFormat k_MZNT_Internal_PreferredDepthAttchFormat   = VK_FORMAT_D32_SFLOAT_S8_UINT;
+static const VkFormat k_MZNT_Internal_PreferredVkColourAttchFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+static const VkFormat k_MZNT_Internal_PreferredVkDepthAttchFormat  = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator)
 {
@@ -410,7 +410,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     {
         VkFormatProperties formatProps = {0};
-        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_MZNT_Internal_PreferredColourAttchFormat, &formatProps);
+        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_MZNT_Internal_PreferredVkColourAttchFormat, &formatProps);
         if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
         {
             PNSLR_LogE(PNSLR_StringLiteral("Preferred colour format not supported as color attachment!"), PNSLR_GET_LOC());
@@ -418,7 +418,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         }
 
         formatProps = (VkFormatProperties) {0};
-        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_MZNT_Internal_PreferredDepthAttchFormat, &formatProps);
+        vkGetPhysicalDeviceFormatProperties(selectedDevice, k_MZNT_Internal_PreferredVkDepthAttchFormat, &formatProps);
         if (!(formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
         {
             PNSLR_LogE(PNSLR_StringLiteral("Preferred depth format not supported as depth attachment!"), PNSLR_GET_LOC());
@@ -800,7 +800,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
         {
             .sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
             .imageType     = VK_IMAGE_TYPE_2D,
-            .format        = k_MZNT_Internal_PreferredDepthAttchFormat,
+            .format        = k_MZNT_Internal_PreferredVkDepthAttchFormat,
             .extent        =
             {
                 .width     = output->swapchainExtent.width,
@@ -825,7 +825,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
             .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image      = output->depthImage,
             .viewType   = VK_IMAGE_VIEW_TYPE_2D,
-            .format     = k_MZNT_Internal_PreferredDepthAttchFormat,
+            .format     = k_MZNT_Internal_PreferredVkDepthAttchFormat,
             .components =
             {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
