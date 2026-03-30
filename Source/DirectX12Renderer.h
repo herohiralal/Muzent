@@ -20,6 +20,7 @@ typedef struct MZNT_DirectX12Renderer
     ID3D12CommandQueue* cmdQueue;
 
     ID3D12Debug* dbgController;
+    u32          dbgCallbackCookie;
 
     void* memoryAllocator; // D3D12MA::Allocator*; can't make type safe here because it's a c++ class
 

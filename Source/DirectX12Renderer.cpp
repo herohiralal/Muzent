@@ -20,6 +20,16 @@
 
 static inline D3D12MA::Allocator*& MZNT_Internal_GetAllocator(MZNT_DirectX12Renderer* renderer) { return (D3D12MA::Allocator*&) renderer->memoryAllocator; }
 
+static void __stdcall MZNT_Internal_Dx12DebugCallback(
+    D3D12_MESSAGE_CATEGORY Category,
+    D3D12_MESSAGE_SEVERITY Severity,
+    D3D12_MESSAGE_ID ID,
+    LPCSTR pDescription,
+    void* pContext)
+{
+    FORCE_DBG_TRAP;
+}
+
 static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
 {
     if (SUCCEEDED(result)) return;
@@ -167,6 +177,16 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
 
             infoQueue->AddStorageFilterEntries(&filter);
 
+            ID3D12InfoQueue1* iq1 = nil;
+            if (SUCCEEDED(output->device->QueryInterface(IID_PPV_ARGS(&iq1))))
+            {
+                DWORD cookie = 0;
+                iq1->RegisterMessageCallback(MZNT_Internal_Dx12DebugCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nil, &cookie);
+                output->dbgCallbackCookie = cookie;
+
+                iq1->Release();
+            }
+
             infoQueue->Release();
         }
     }
@@ -250,6 +270,19 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     MZNT_Internal_GetAllocator(renderer)->Release();
 
     renderer->cmdQueue->Release();
+
+    ID3D12InfoQueue* iq = nil;
+    if (SUCCEEDED(renderer->device->QueryInterface(IID_PPV_ARGS(&iq))))
+    {
+        ID3D12InfoQueue1* iq1 = nil;
+        if (SUCCEEDED(iq->QueryInterface(IID_PPV_ARGS(&iq1))))
+        {
+            iq1->UnregisterMessageCallback(renderer->dbgCallbackCookie);
+            iq1->Release();
+        }
+
+        iq->Release();
+    }
 
     renderer->device->Release();
 
