@@ -1017,7 +1017,6 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
     // final blit shader pipeline
     {
-        // TODO: replace with immutable sampler thing
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSampler(renderer->device, &(VkSamplerCreateInfo)
         {
             .sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -1062,6 +1061,7 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
                     .descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER,
                     .descriptorCount    = 1,
                     .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .pImmutableSamplers = (VkSampler[]) { output->finalBlitSampler },
                 }
             }
         }, nil, &output->finalBlitShader.descriptorSetLayout));
@@ -1488,7 +1488,7 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
     {
         vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipeline);
 
-        vkUpdateDescriptorSets(surface->renderer->device, 2, (VkWriteDescriptorSet[])
+        vkUpdateDescriptorSets(surface->renderer->device, 1, (VkWriteDescriptorSet[])
         {
             {
                 .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -1502,17 +1502,6 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 },
             },
-            {
-                .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet          = surface->finalBlitDescriptorSets[surface->curFrame],
-                .dstBinding      = 1,
-                .descriptorCount = 1,
-                .descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER,
-                .pImageInfo      = &(VkDescriptorImageInfo)
-                {
-                    .sampler = surface->finalBlitSampler,
-                },
-            }
         }, 0, nil);
 
         vkCmdBindDescriptorSets(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->finalBlitShader.pipelineLayout,
