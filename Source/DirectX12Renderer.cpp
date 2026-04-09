@@ -361,18 +361,22 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         colourClearValue.Color[2] = 0.0f;
         colourClearValue.Color[3] = 1.0f;
 
-        D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        D3D12MA::ALLOCATION_DESC allocationDesc = { };
+        allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
         for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
+            D3D12MA::Allocation* allocation = nil;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(MZNT_Internal_GetAllocator(surface->renderer)->CreateResource(
+                &allocationDesc,
                 &colourDesc,
                 D3D12_RESOURCE_STATE_RENDER_TARGET,
                 &colourClearValue,
+                &allocation,
                 IID_PPV_ARGS(&(surface->screenBuffer[i]))
             ));
+
+            surface->screenBufferAllocations[i] = allocation;
         }
     }
 
@@ -424,18 +428,22 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
         depthClearValue.Format             = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
         depthClearValue.DepthStencil.Depth = 1.0f; // stencil is 0-init
 
-        D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        D3D12MA::ALLOCATION_DESC allocationDesc = { };
+        allocationDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
 
         for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->device->CreateCommittedResource(
-                &heapProps,
-                D3D12_HEAP_FLAG_NONE,
+            D3D12MA::Allocation* allocation = nil;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(MZNT_Internal_GetAllocator(surface->renderer)->CreateResource(
+                &allocationDesc,
                 &depthDesc,
                 D3D12_RESOURCE_STATE_DEPTH_WRITE,
                 &depthClearValue,
+                &allocation,
                 IID_PPV_ARGS(&(surface->depthBuffer[i]))
             ));
+
+            surface->depthBufferAllocations[i] = allocation;
         }
     }
 
@@ -671,6 +679,7 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         surface->depthBuffer[i]->Release();
+        ((D3D12MA::Allocation*) surface->depthBufferAllocations[i])->Release();
     }
     surface->dsvHeap->Release();
 
@@ -678,6 +687,7 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         surface->screenBuffer[i]->Release();
+        ((D3D12MA::Allocation*) surface->screenBufferAllocations[i])->Release();
     }
     surface->svSrvHeap->Release();
     surface->svRtvHeap->Release();

@@ -53,6 +53,7 @@ typedef struct MZNT_DirectX12RendererSurface
 
     // screen buffer
     ID3D12Resource*       screenBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
+    void*                 screenBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
     ID3D12DescriptorHeap* svRtvHeap;
     UINT                  svRtvDescriptorSize;
     ID3D12DescriptorHeap* svSrvHeap;
@@ -60,6 +61,7 @@ typedef struct MZNT_DirectX12RendererSurface
 
     // depth
     ID3D12Resource*       depthBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
+    void*                 depthBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
     ID3D12DescriptorHeap* dsvHeap;
     UINT                  dsvDescriptorSize;
 
