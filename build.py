@@ -2,16 +2,16 @@ import os, sys, time
 from pathlib import Path
 from Source.Dependencies.Panshilar import buildutils, metaprogdumpfile
 
-SHADER_COMPILE_MODE_VK      = 'vk'
-SHADER_COMPILE_MODE_DX12_VS = 'dx12_vs'
-SHADER_COMPILE_MODE_DX12_PS = 'dx12_ps'
-SHADER_COMPILE_MODE_MTL     = 'mtl'
+SHADER_EXT_COMPUTE = '.cmpt.slang'
+SHADER_EXT_TASK    = '.task.slang'
+SHADER_EXT_MESH    = '.mesh.slang'
+SHADER_EXT_VERT    = '.vert.slang'
+SHADER_EXT_FRAG    = '.frag.slang'
 
 def compileShader(
-        mode: str,
-        inputFile: str,
-        entryPts: list[str],
-        intermDir: str,
+        inputPath:  Path,
+        mode:       str, # 'spirv' or 'dxil'
+        intermDir:  str,
         outputFile: str
     ) -> bool:
     # basically what we'll do is turn the input file into an intermediate file using slangc
@@ -20,29 +20,39 @@ def compileShader(
     #
     # then, we'll turn the intermediate file into a c11 file using file dumper
 
+    inputFile = str(inputPath)
+    dxilProfile = ''
+    if False:
+        dxilProfile = ''
+    elif inputFile.endswith(SHADER_EXT_COMPUTE):
+        dxilProfile = 'cs_6_0'
+    elif inputFile.endswith(SHADER_EXT_TASK):
+        dxilProfile = 'as_6_0'
+    elif inputFile.endswith(SHADER_EXT_MESH):
+        dxilProfile = 'ms_6_0'
+    elif inputFile.endswith(SHADER_EXT_VERT):
+        dxilProfile = 'vs_6_0'
+    elif inputFile.endswith(SHADER_EXT_FRAG):
+        dxilProfile = 'ps_6_0'
+    if not dxilProfile:
+        return True # not relevant
+
     currNsSinceUnixEpoch = time.time_ns()
 
-    inputPath = Path(inputFile)
     intermFile = intermDir + 'ShaderBytecodes' + inputPath.stem + '-tmpout-' + mode + '-' + str(currNsSinceUnixEpoch) + '.tmpShahdr'
     compileCommmand: list[str] = ['slangc.exe' if sys.platform == 'win32' else 'slangc', inputFile]
-    if mode == SHADER_COMPILE_MODE_VK:
-        compileCommmand += ['-target', 'spirv', '-profile', 'spirv_1_4', '-emit-spirv-directly', '-fvk-use-entrypoint-name']
-        for ep in entryPts:
-            compileCommmand += ['-entry', ep]
-    elif mode == SHADER_COMPILE_MODE_DX12_VS:
-        compileCommmand += ['-target', 'dxil', '-profile', 'vs_6_0']
-        for ep in entryPts:
-            compileCommmand += ['-entry', ep]
-    elif mode == SHADER_COMPILE_MODE_DX12_PS:
-        compileCommmand += ['-target', 'dxil', '-profile', 'ps_6_0']
-        for ep in entryPts:
-            compileCommmand += ['-entry', ep]
-    elif mode == SHADER_COMPILE_MODE_MTL:
+
+    if mode == 'spirv':
+        compileCommmand += ['-target', 'spirv', '-profile', 'spirv_1_4']
+    elif mode == 'dxil':
+        compileCommmand += ['-target', 'dxil', '-profile', dxilProfile]
+    elif mode == 'mtl':
         compileCommmand += ['-target', 'metal'] # TODO
     else:
         buildutils.printErr(f'Unknown shader compile mode: {mode}')
         return False
-    compileCommmand += ['-o', intermFile]
+
+    compileCommmand += ['-entry', 'main', '-o', intermFile]
 
     if not buildutils.runCommand(
         compileCommmand,
@@ -58,36 +68,35 @@ FOLDER_STRUCTURE = buildutils.getFolderStructure(os.path.dirname(os.path.abspath
 MAIN_FILE_C   = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.c'
 MAIN_FILE_CXX = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.cpp'
 
-TRIANGLE_SLANG_FILE        = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle.slang'
-TRIANGLE_SPIRV_SRC_FILE    = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_spv.c'
-TRIANGLE_DXIL_VS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_dxil_vs.c'
-TRIANGLE_DXIL_PS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/triangle_dxil_ps.c'
-
-FULLSCREENBLIT_SLANG_FILE        = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit.slang'
-FULLSCREENBLIT_SPIRV_SRC_FILE    = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_spv.c'
-FULLSCREENBLIT_DXIL_VS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_dxil_vs.c'
-FULLSCREENBLIT_DXIL_PS_SRC_FILE  = FOLDER_STRUCTURE.srcDir + 'Shaders/fullscreenBlit_dxil_ps.c'
-
 def recompileShaders() -> bool:
     success = True
 
-    if not compileShader(SHADER_COMPILE_MODE_VK, TRIANGLE_SLANG_FILE, ['vertMain', 'fragMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_SPIRV_SRC_FILE):
-        success = False
+    shaderDir = Path(FOLDER_STRUCTURE.srcDir + 'Shaders')
 
-    if not compileShader(SHADER_COMPILE_MODE_DX12_VS, TRIANGLE_SLANG_FILE, ['vertMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_DXIL_VS_SRC_FILE):
-        success = False
+    for root, _, files in os.walk(shaderDir):
+        for file in files:
+            fullPath = Path(root) / file
 
-    if not compileShader(SHADER_COMPILE_MODE_DX12_PS, TRIANGLE_SLANG_FILE, ['fragMain'], FOLDER_STRUCTURE.tmpDir, TRIANGLE_DXIL_PS_SRC_FILE):
-        success = False
+            if not file.endswith('.slang'):
+                continue
 
-    if not compileShader(SHADER_COMPILE_MODE_VK, FULLSCREENBLIT_SLANG_FILE, ['vertMain', 'fragMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_SPIRV_SRC_FILE):
-        success = False
+            # SPIR-V
+            if not compileShader(
+                fullPath,
+                'spirv',
+                FOLDER_STRUCTURE.tmpDir,
+                str(fullPath).replace('.slang', '.spv.c')
+            ):
+                success = False
 
-    if not compileShader(SHADER_COMPILE_MODE_DX12_VS, FULLSCREENBLIT_SLANG_FILE, ['vertMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_DXIL_VS_SRC_FILE):
-        success = False
-
-    if not compileShader(SHADER_COMPILE_MODE_DX12_PS, FULLSCREENBLIT_SLANG_FILE, ['fragMain'], FOLDER_STRUCTURE.tmpDir, FULLSCREENBLIT_DXIL_PS_SRC_FILE):
-        success = False
+            # DXIL
+            if not compileShader(
+                fullPath,
+                'dxil',
+                FOLDER_STRUCTURE.tmpDir,
+                str(fullPath).replace('.slang', '.dxil.c')
+            ):
+                success = False
 
     return success
 

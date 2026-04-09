@@ -2,20 +2,20 @@
 #include "DirectX12Renderer.h"
 #if MZNT_DX12
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12TriangleShaderVS
-#include "Shaders/triangle_dxil_vs.c"
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleVS
+#include "Shaders/HelloTriangle/HelloTriangle.vert.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12TriangleShaderPS
-#include "Shaders/triangle_dxil_ps.c"
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleFS
+#include "Shaders/HelloTriangle/HelloTriangle.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullscreenBlitShaderVS
-#include "Shaders/fullscreenBlit_dxil_vs.c"
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitVS
+#include "Shaders/FullScreenBlit/FullScreenBlit.vert.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullscreenBlitShaderPS
-#include "Shaders/fullscreenBlit_dxil_ps.c"
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitFS
+#include "Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 static inline D3D12MA::Allocator*& MZNT_Internal_GetAllocator(MZNT_DirectX12Renderer* renderer) { return (D3D12MA::Allocator*&) renderer->memoryAllocator; }
@@ -203,7 +203,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     allocDesc.pAdapter = output->adapter;
     MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12MA::CreateAllocator(&allocDesc, &MZNT_Internal_GetAllocator(output)));
 
-    // triangle shader
+    // hello triangle shader
     {
         // root signature
         {
@@ -224,7 +224,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
                     0,
                     serializedDesc->GetBufferPointer(),
                     serializedDesc->GetBufferSize(),
-                    IID_PPV_ARGS(&(output->triangleShader.rootSignature))
+                    IID_PPV_ARGS(&(output->helloTriangleShader.rootSignature))
                 ));
             serializedDesc->Release();
         }
@@ -236,11 +236,11 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             inputLayout.NumElements        = 0;
 
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
-            psoDesc.pRootSignature                  = output->triangleShader.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12TriangleShaderVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12TriangleShaderVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12TriangleShaderPSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12TriangleShaderPSSize;
+            psoDesc.pRootSignature                  = output->helloTriangleShader.rootSignature;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleFSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleFSSize;
             psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -253,7 +253,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             psoDesc.DepthStencilState               = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
             psoDesc.DSVFormat                       = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
 
-            MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->triangleShader.pipelineState))));
+            MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->helloTriangleShader.pipelineState))));
         }
     }
 
@@ -264,8 +264,8 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 {
     if (!renderer) return false;
 
-    renderer->triangleShader.pipelineState->Release();
-    renderer->triangleShader.rootSignature->Release();
+    renderer->helloTriangleShader.pipelineState->Release();
+    renderer->helloTriangleShader.rootSignature->Release();
 
     MZNT_Internal_GetAllocator(renderer)->Release();
 
@@ -621,10 +621,10 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
 
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
             psoDesc.pRootSignature                  = output->finalBlitShader.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12FullscreenBlitShaderVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12FullscreenBlitShaderVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12FullscreenBlitShaderPSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12FullscreenBlitShaderPSSize;
+            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12FullScreenBlitVSContents;
+            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12FullScreenBlitVSSize;
+            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12FullScreenBlitFSContents;
+            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12FullScreenBlitFSSize;
             psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
             psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
             psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -775,8 +775,8 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
 
     // draw triangle
     {
-        cmdBuffer.cmdList->SetPipelineState(surface->renderer->triangleShader.pipelineState);
-        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->triangleShader.rootSignature);
+        cmdBuffer.cmdList->SetPipelineState(surface->renderer->helloTriangleShader.pipelineState);
+        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->helloTriangleShader.rootSignature);
         cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
         cmdBuffer.cmdList->IASetIndexBuffer(nil);

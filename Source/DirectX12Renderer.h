@@ -24,7 +24,7 @@ typedef struct MZNT_DirectX12Renderer
 
     void* memoryAllocator; // D3D12MA::Allocator*; can't make type safe here because it's a c++ class
 
-    MZNT_DirectX12Shader triangleShader;
+    MZNT_DirectX12Shader helloTriangleShader;
 } MZNT_DirectX12Renderer;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
