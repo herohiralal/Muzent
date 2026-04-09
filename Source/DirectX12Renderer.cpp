@@ -699,7 +699,6 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
 
 b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator)
 {
-    // TODO: resize depth image as well
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
