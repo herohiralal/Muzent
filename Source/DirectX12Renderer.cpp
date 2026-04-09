@@ -18,8 +18,6 @@
 #include "Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
-static inline D3D12MA::Allocator*& MZNT_Internal_GetAllocator(MZNT_DirectX12Renderer* renderer) { return (D3D12MA::Allocator*&) renderer->memoryAllocator; }
-
 static void __stdcall MZNT_Internal_Dx12DebugCallback(
     D3D12_MESSAGE_CATEGORY Category,
     D3D12_MESSAGE_SEVERITY Severity,
@@ -201,7 +199,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     D3D12MA::ALLOCATOR_DESC allocDesc = { };
     allocDesc.pDevice = output->device;
     allocDesc.pAdapter = output->adapter;
-    MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12MA::CreateAllocator(&allocDesc, &MZNT_Internal_GetAllocator(output)));
+    MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12MA::CreateAllocator(&allocDesc, &(output->d3d12maAllocator)));
 
     // hello triangle shader
     {
@@ -267,7 +265,7 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     renderer->helloTriangleShader.pipelineState->Release();
     renderer->helloTriangleShader.rootSignature->Release();
 
-    MZNT_Internal_GetAllocator(renderer)->Release();
+    renderer->d3d12maAllocator->Release();
 
     renderer->cmdQueue->Release();
 
@@ -366,17 +364,14 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
 
         for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            D3D12MA::Allocation* allocation = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(MZNT_Internal_GetAllocator(surface->renderer)->CreateResource(
+            MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->d3d12maAllocator->CreateResource(
                 &allocationDesc,
                 &colourDesc,
                 D3D12_RESOURCE_STATE_RENDER_TARGET,
                 &colourClearValue,
-                &allocation,
+                &(surface->screenBufferAllocations[i]),
                 IID_PPV_ARGS(&(surface->screenBuffer[i]))
             ));
-
-            surface->screenBufferAllocations[i] = allocation;
         }
     }
 
@@ -433,17 +428,14 @@ static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurfac
 
         for (i32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         {
-            D3D12MA::Allocation* allocation = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(MZNT_Internal_GetAllocator(surface->renderer)->CreateResource(
+            MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->d3d12maAllocator->CreateResource(
                 &allocationDesc,
                 &depthDesc,
                 D3D12_RESOURCE_STATE_DEPTH_WRITE,
                 &depthClearValue,
-                &allocation,
+                &(surface->depthBufferAllocations[i]),
                 IID_PPV_ARGS(&(surface->depthBuffer[i]))
             ));
-
-            surface->depthBufferAllocations[i] = allocation;
         }
     }
 
@@ -679,7 +671,7 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         surface->depthBuffer[i]->Release();
-        ((D3D12MA::Allocation*) surface->depthBufferAllocations[i])->Release();
+        surface->depthBufferAllocations[i]->Release();
     }
     surface->dsvHeap->Release();
 
@@ -687,7 +679,7 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         surface->screenBuffer[i]->Release();
-        ((D3D12MA::Allocation*) surface->screenBufferAllocations[i])->Release();
+        surface->screenBufferAllocations[i]->Release();
     }
     surface->svSrvHeap->Release();
     surface->svRtvHeap->Release();

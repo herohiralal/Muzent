@@ -5,6 +5,14 @@
 EXTERN_C_BEGIN
 #if defined(MZNT_IMPLEMENTATION) && MZNT_DX12
 
+#ifdef __cplusplus
+typedef class D3D12MA::Allocator* DxAllocator;
+typedef class D3D12MA::Allocation* DxAllocation;
+#else
+typedef struct DxAllocator* DxAllocator;
+typedef struct DxAllocation* DxAllocation;
+#endif
+
 typedef struct MZNT_DirectX12Shader
 {
     ID3D12RootSignature* rootSignature;
@@ -22,7 +30,7 @@ typedef struct MZNT_DirectX12Renderer
     ID3D12Debug* dbgController;
     u32          dbgCallbackCookie;
 
-    void* memoryAllocator; // D3D12MA::Allocator*; can't make type safe here because it's a c++ class
+    DxAllocator d3d12maAllocator;
 
     MZNT_DirectX12Shader helloTriangleShader;
 } MZNT_DirectX12Renderer;
@@ -53,7 +61,7 @@ typedef struct MZNT_DirectX12RendererSurface
 
     // screen buffer
     ID3D12Resource*       screenBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
-    void*                 screenBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
+    DxAllocation          screenBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
     ID3D12DescriptorHeap* svRtvHeap;
     UINT                  svRtvDescriptorSize;
     ID3D12DescriptorHeap* svSrvHeap;
@@ -61,7 +69,7 @@ typedef struct MZNT_DirectX12RendererSurface
 
     // depth
     ID3D12Resource*       depthBuffer[MZNT_NUM_FRAMES_IN_FLIGHT];
-    void*                 depthBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
+    DxAllocation          depthBufferAllocations[MZNT_NUM_FRAMES_IN_FLIGHT];
     ID3D12DescriptorHeap* dsvHeap;
     UINT                  dsvDescriptorSize;
 
