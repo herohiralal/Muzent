@@ -84,25 +84,6 @@ b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, 
 MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
 b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocator tempAllocator);
 
-typedef struct MZNT_DirectX12Mesh
-{
-    MZNT_Mesh             parent;
-    MZNT_DirectX12Renderer*  owner;
-
-    // VkBuffer      meshBuffer;
-    // VmaAllocation meshAllocation;
-
-    MZNT_IndexType idxType;
-
-    u32             vertexCount;
-    u32             indexCount;
-    i64             vertexBufferSize;
-    i64             indexBufferSize;
-} MZNT_DirectX12Mesh;
-
-MZNT_DirectX12Mesh* MZNT_UploadMesh_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_MeshCreateInfo* createInfo, PNSLR_Allocator tempAllocator);
-b8 MZNT_DestroyMesh_DirectX12(MZNT_DirectX12Mesh* mesh, PNSLR_Allocator tempAllocator);
-
 #endif
 EXTERN_C_END
 #endif
