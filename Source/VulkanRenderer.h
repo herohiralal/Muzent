@@ -23,6 +23,7 @@ PNSLR_DECLARE_ARRAY_SLICE(VmaAllocation);
 typedef struct MZNT_VulkanShader
 {
     VkShaderModule        vsModule;
+    VkShaderModule        msModule;
     VkShaderModule        fsModule;
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout      pipelineLayout;
@@ -44,7 +45,8 @@ typedef struct MZNT_VulkanRenderer
 
     VmaAllocator     vmaAllocator;
 
-    MZNT_VulkanShader helloTriangleShader;
+    MZNT_VulkanShader helloTriangleVertexShadedProgram;
+    MZNT_VulkanShader helloTriangleMeshShadedProgram;
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);

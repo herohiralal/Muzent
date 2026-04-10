@@ -6,6 +6,10 @@
 #include "Shaders/HelloTriangle/HelloTriangle.vert.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
+#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleMS
+#include "Shaders/HelloTriangle/HelloTriangle.mesh.spv.c"
+#undef INLINED_FILE_INCLUSION_NAME
+
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleFS
 #include "Shaders/HelloTriangle/HelloTriangle.frag.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
@@ -561,38 +565,38 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         },
     }, &(output->vmaAllocator)));
 
-    // triangle shader pipeline
+    // hello triangle pipeline - vs
     {
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
         {
             .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .codeSize = (size_t) k_MZNT_Internal_VkHelloTriangleVSSize,
             .pCode    = (u32*)   k_MZNT_Internal_VkHelloTriangleVSContents,
-        }, nil, &output->helloTriangleShader.vsModule));
+        }, nil, &output->helloTriangleVertexShadedProgram.vsModule));
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
         {
             .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             .codeSize = (size_t) k_MZNT_Internal_VkHelloTriangleFSSize,
             .pCode    = (u32*)   k_MZNT_Internal_VkHelloTriangleFSContents,
-        }, nil, &output->helloTriangleShader.fsModule));
+        }, nil, &output->helloTriangleVertexShadedProgram.fsModule));
 
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &(VkPipelineLayoutCreateInfo)
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        }, nil, &output->helloTriangleShader.pipelineLayout));
+        }, nil, &output->helloTriangleVertexShadedProgram.pipelineLayout));
 
-        VkPipelineShaderStageCreateInfo helloTriangleShaderStages[] = {
+        VkPipelineShaderStageCreateInfo helloTriangleVertexShadedProgramStages[] = {
             {
                 .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage  = VK_SHADER_STAGE_VERTEX_BIT,
-                .module = output->helloTriangleShader.vsModule,
+                .module = output->helloTriangleVertexShadedProgram.vsModule,
                 .pName  = "main",
             },
             {
                 .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .module = output->helloTriangleShader.fsModule,
+                .module = output->helloTriangleVertexShadedProgram.fsModule,
                 .pName  = "main",
             },
         };
@@ -602,8 +606,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(output->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
         {
             .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-            .stageCount                  = sizeof(helloTriangleShaderStages) / sizeof(VkPipelineShaderStageCreateInfo),
-            .pStages                     = helloTriangleShaderStages,
+            .stageCount                  = sizeof(helloTriangleVertexShadedProgramStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages                     = helloTriangleVertexShadedProgramStages,
             .pVertexInputState           = &(VkPipelineVertexInputStateCreateInfo)
             {
                 .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -656,7 +660,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
                 .pDynamicStates          = dynamicStates,
             },
-            .layout                      = output->helloTriangleShader.pipelineLayout,
+            .layout                      = output->helloTriangleVertexShadedProgram.pipelineLayout,
             .renderPass                  = VK_NULL_HANDLE,
             .pNext                       = &(VkPipelineRenderingCreateInfo)
             {
@@ -666,7 +670,108 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
                 .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
             },
-        }, nil, &output->helloTriangleShader.pipeline));
+        }, nil, &output->helloTriangleVertexShadedProgram.pipeline));
+    }
+
+    // hello triangle pipeline - ms
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
+        {
+            .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = (size_t) k_MZNT_Internal_VkHelloTriangleMSSize,
+            .pCode    = (u32*)   k_MZNT_Internal_VkHelloTriangleMSContents,
+        }, nil, &output->helloTriangleMeshShadedProgram.msModule));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateShaderModule(output->device, &(VkShaderModuleCreateInfo)
+        {
+            .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = (size_t) k_MZNT_Internal_VkHelloTriangleFSSize,
+            .pCode    = (u32*)   k_MZNT_Internal_VkHelloTriangleFSContents,
+        }, nil, &output->helloTriangleMeshShadedProgram.fsModule));
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreatePipelineLayout(output->device, &(VkPipelineLayoutCreateInfo)
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        }, nil, &output->helloTriangleMeshShadedProgram.pipelineLayout));
+
+        VkPipelineShaderStageCreateInfo helloTriangleMeshShadedProgramStages[] = {
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_MESH_BIT_EXT,
+                .module = output->helloTriangleMeshShadedProgram.msModule,
+                .pName  = "main",
+            },
+            {
+                .sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .module = output->helloTriangleMeshShadedProgram.fsModule,
+                .pName  = "main",
+            },
+        };
+
+        VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateGraphicsPipelines(output->device, VK_NULL_HANDLE, 1, &(VkGraphicsPipelineCreateInfo)
+        {
+            .sType                       = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+            .stageCount                  = sizeof(helloTriangleMeshShadedProgramStages) / sizeof(VkPipelineShaderStageCreateInfo),
+            .pStages                     = helloTriangleMeshShadedProgramStages,
+            .pVertexInputState           = nil,
+            .pInputAssemblyState         = nil,
+            .pViewportState              = &(VkPipelineViewportStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+                .viewportCount           = 1,
+                .scissorCount            = 1,
+            },
+            .pRasterizationState         = &(VkPipelineRasterizationStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                .depthClampEnable        = VK_FALSE,
+                .rasterizerDiscardEnable = VK_FALSE,
+                .polygonMode             = VK_POLYGON_MODE_FILL,
+                .cullMode                = VK_CULL_MODE_BACK_BIT,
+                .frontFace               = VK_FRONT_FACE_CLOCKWISE,
+                .depthBiasEnable         = VK_FALSE,
+                .depthBiasSlopeFactor    = 1.0f,
+                .lineWidth               = 1.0f,
+            },
+            .pMultisampleState           = &(VkPipelineMultisampleStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                .rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT,
+            },
+            .pColorBlendState            = &(VkPipelineColorBlendStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+                .logicOpEnable           = VK_FALSE,
+                .logicOp                 = VK_LOGIC_OP_COPY,
+                .attachmentCount         = 1,
+                .pAttachments            = &(VkPipelineColorBlendAttachmentState)
+                {
+                    .colorWriteMask      = VK_COLOR_COMPONENT_R_BIT |
+                                           VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT |
+                                           VK_COLOR_COMPONENT_A_BIT,
+                },
+            },
+            .pDynamicState               = &(VkPipelineDynamicStateCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+                .dynamicStateCount       = sizeof(dynamicStates) / sizeof(VkDynamicState),
+                .pDynamicStates          = dynamicStates,
+            },
+            .layout                      = output->helloTriangleMeshShadedProgram.pipelineLayout,
+            .renderPass                  = VK_NULL_HANDLE,
+            .pNext                       = &(VkPipelineRenderingCreateInfo)
+            {
+                .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+                .colorAttachmentCount    = 1,
+                .pColorAttachmentFormats = &k_MZNT_Internal_PreferredVkColourAttchFormat,
+                .depthAttachmentFormat   = VK_FORMAT_UNDEFINED,
+                .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+            },
+        }, nil, &output->helloTriangleMeshShadedProgram.pipeline));
     }
 
     return output;
@@ -678,10 +783,15 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
 
-    vkDestroyPipeline(renderer->device, renderer->helloTriangleShader.pipeline, nil);
-    vkDestroyPipelineLayout(renderer->device, renderer->helloTriangleShader.pipelineLayout, nil);
-    vkDestroyShaderModule(renderer->device, renderer->helloTriangleShader.fsModule, nil);
-    vkDestroyShaderModule(renderer->device, renderer->helloTriangleShader.vsModule, nil);
+    vkDestroyPipeline(renderer->device, renderer->helloTriangleMeshShadedProgram.pipeline, nil);
+    vkDestroyPipelineLayout(renderer->device, renderer->helloTriangleMeshShadedProgram.pipelineLayout, nil);
+    vkDestroyShaderModule(renderer->device, renderer->helloTriangleMeshShadedProgram.fsModule, nil);
+    vkDestroyShaderModule(renderer->device, renderer->helloTriangleMeshShadedProgram.msModule, nil);
+
+    vkDestroyPipeline(renderer->device, renderer->helloTriangleVertexShadedProgram.pipeline, nil);
+    vkDestroyPipelineLayout(renderer->device, renderer->helloTriangleVertexShadedProgram.pipelineLayout, nil);
+    vkDestroyShaderModule(renderer->device, renderer->helloTriangleVertexShadedProgram.fsModule, nil);
+    vkDestroyShaderModule(renderer->device, renderer->helloTriangleVertexShadedProgram.vsModule, nil);
 
     vmaDestroyAllocator(renderer->vmaAllocator);
 
@@ -1231,6 +1341,7 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     vkDestroyPipelineLayout(surface->renderer->device, surface->finalBlitShader.pipelineLayout, nil);
     vkDestroyDescriptorSetLayout(surface->renderer->device, surface->finalBlitShader.descriptorSetLayout, nil);
     vkDestroyShaderModule(surface->renderer->device, surface->finalBlitShader.fsModule, nil);
+    vkDestroyShaderModule(surface->renderer->device, surface->finalBlitShader.msModule, nil);
     vkDestroyShaderModule(surface->renderer->device, surface->finalBlitShader.vsModule, nil);
     vkDestroySampler(surface->renderer->device, surface->finalBlitSampler, nil);
 
@@ -1420,10 +1531,15 @@ MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurf
         .pStencilAttachment = nil,
     });
 
-    // draw triangle
+    // draw triangle - vs
     {
-        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->helloTriangleShader.pipeline);
+        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->helloTriangleVertexShadedProgram.pipeline);
         vkCmdDraw(cmdBuf->cmdBuffer, 3, 1, 0, 0);
+    }
+    // draw triangle - ms
+    {
+        vkCmdBindPipeline(cmdBuf->cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, surface->renderer->helloTriangleMeshShadedProgram.pipeline);
+        vkCmdDrawMeshTasksEXT(cmdBuf->cmdBuffer, 1, 1, 1);
     }
 
     return cmdBuf;

@@ -24,7 +24,7 @@ typedef struct MZNT_DirectX12Renderer
     MZNT_Renderer       parent;
     IDXGIFactory6*      dxgiFactory;
     IDXGIAdapter1*      adapter;
-    ID3D12Device*       device;
+    ID3D12Device2*      device;
     ID3D12CommandQueue* cmdQueue;
 
     ID3D12Debug* dbgController;
@@ -32,7 +32,8 @@ typedef struct MZNT_DirectX12Renderer
 
     DxAllocator d3d12maAllocator;
 
-    MZNT_DirectX12Shader helloTriangleShader;
+    MZNT_DirectX12Shader helloTriangleVertexShadedProgram;
+    MZNT_DirectX12Shader helloTriangleMeshShadedProgram;
 } MZNT_DirectX12Renderer;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
@@ -40,10 +41,10 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 
 typedef struct MZNT_DirectX12RendererCommandBuffer
 {
-    MZNT_RendererCommandBuffer parent;
-    MZNT_DirectX12Renderer*    renderer;
-    ID3D12CommandAllocator*    cmdAllocator;
-    ID3D12GraphicsCommandList* cmdList;
+    MZNT_RendererCommandBuffer  parent;
+    MZNT_DirectX12Renderer*     renderer;
+    ID3D12CommandAllocator*     cmdAllocator;
+    ID3D12GraphicsCommandList6* cmdList;
 } MZNT_DirectX12RendererCommandBuffer;
 
 typedef struct MZNT_DirectX12RendererSurface
