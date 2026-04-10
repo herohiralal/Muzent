@@ -1,25 +1,25 @@
 #define MZNT_IMPLEMENTATION
-#include "DirectX12Renderer.h"
+#include "Dx12Renderer.h"
 #if MZNT_DX12
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleVS
-#include "Shaders/HelloTriangle/HelloTriangle.vert.dxil.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.vert.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleMS
-#include "Shaders/HelloTriangle/HelloTriangle.mesh.dxil.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.mesh.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleFS
-#include "Shaders/HelloTriangle/HelloTriangle.frag.dxil.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitVS
-#include "Shaders/FullScreenBlit/FullScreenBlit.vert.dxil.c"
+#include "../Shaders/FullScreenBlit/FullScreenBlit.vert.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitFS
-#include "Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
+#include "../Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 static void __stdcall MZNT_Internal_Dx12DebugCallback(

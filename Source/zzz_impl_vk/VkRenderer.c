@@ -1,25 +1,25 @@
 #define MZNT_IMPLEMENTATION
-#include "VulkanRenderer.h"
+#include "VkRenderer.h"
 #if MZNT_VULKAN
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleVS
-#include "Shaders/HelloTriangle/HelloTriangle.vert.spv.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.vert.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleMS
-#include "Shaders/HelloTriangle/HelloTriangle.mesh.spv.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.mesh.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleFS
-#include "Shaders/HelloTriangle/HelloTriangle.frag.spv.c"
+#include "../Shaders/HelloTriangle/HelloTriangle.frag.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullScreenBlitVS
-#include "Shaders/FullScreenBlit/FullScreenBlit.vert.spv.c"
+#include "../Shaders/FullScreenBlit/FullScreenBlit.vert.spv.c"
 #undef INLINED_FILE_INCLUSION_NAME
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullScreenBlitFS
-#include "Shaders/FullScreenBlit/FullScreenBlit.frag.spv.c"
+#include "../Shaders/FullScreenBlit/FullScreenBlit.frag.spv.c"
 
 VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
