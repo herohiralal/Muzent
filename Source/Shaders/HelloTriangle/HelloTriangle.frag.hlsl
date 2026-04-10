@@ -1,6 +1,5 @@
 #include "HelloTriangle.common.hlsl"
 
-[shader("fragment")]
 float4 main(VertexOutput inVert)
     : SV_Target
 {

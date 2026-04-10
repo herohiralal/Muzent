@@ -2,11 +2,21 @@ import os, sys, time
 from pathlib import Path
 from Source.Dependencies.Panshilar import buildutils, metaprogdumpfile
 
-SHADER_EXT_COMPUTE = '.cmpt.slang'
-SHADER_EXT_TASK    = '.task.slang'
-SHADER_EXT_MESH    = '.mesh.slang'
-SHADER_EXT_VERT    = '.vert.slang'
-SHADER_EXT_FRAG    = '.frag.slang'
+FOLDER_STRUCTURE = buildutils.getFolderStructure(os.path.dirname(os.path.abspath(__file__)))
+MAIN_FILE_C   = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.c'
+MAIN_FILE_CXX = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.cpp'
+
+DXC_PATH = os.path.join(
+    FOLDER_STRUCTURE.depDir, 'dxc', 'bin',
+    'linux-x64' if sys.platform == 'linux' else 'win-x64' if sys.platform == 'win32' else '',
+    'dxc' if sys.platform == 'linux' else 'dxc.exe' if sys.platform == 'win32' else ''
+).replace('\\', '/') if sys.platform == 'linux' or sys.platform == 'win32' else ''
+
+SHADER_EXT_COMPUTE = '.cmpt.hlsl'
+SHADER_EXT_TASK    = '.task.hlsl'
+SHADER_EXT_MESH    = '.mesh.hlsl'
+SHADER_EXT_VERT    = '.vert.hlsl'
+SHADER_EXT_FRAG    = '.frag.hlsl'
 
 def compileShader(
         inputPath:  Path,
@@ -14,45 +24,53 @@ def compileShader(
         intermDir:  str,
         outputFile: str
     ) -> bool:
-    # basically what we'll do is turn the input file into an intermediate file using slangc
+    # basically what we'll do is turn the input file into an intermediate file using dxc
     # - for vulkan, this is a spirv file
     # - for dx12, this is a dxil file
     #
     # then, we'll turn the intermediate file into a c11 file using file dumper
 
     inputFile = str(inputPath)
-    dxilProfile = ''
+    profile = ''
+    useSpvExt = False
     if False:
-        dxilProfile = ''
+        profile = ''
     elif inputFile.endswith(SHADER_EXT_COMPUTE):
-        dxilProfile = 'cs_6_0'
+        profile = 'cs_6_0'
     elif inputFile.endswith(SHADER_EXT_TASK):
-        dxilProfile = 'as_6_0'
+        profile = 'as_6_5'
+        useSpvExt = True
     elif inputFile.endswith(SHADER_EXT_MESH):
-        dxilProfile = 'ms_6_0'
+        profile = 'ms_6_5'
+        useSpvExt = True
     elif inputFile.endswith(SHADER_EXT_VERT):
-        dxilProfile = 'vs_6_0'
+        profile = 'vs_6_0'
     elif inputFile.endswith(SHADER_EXT_FRAG):
-        dxilProfile = 'ps_6_0'
-    if not dxilProfile:
+        profile = 'ps_6_0'
+
+    if not profile:
         return True # not relevant
 
     currNsSinceUnixEpoch = time.time_ns()
 
     intermFile = intermDir + 'ShaderBytecodes' + inputPath.stem + '-tmpout-' + mode + '-' + str(currNsSinceUnixEpoch) + '.tmpShahdr'
-    compileCommmand: list[str] = ['slangc.exe' if sys.platform == 'win32' else 'slangc', inputFile]
+    compileCommmand: list[str] = [DXC_PATH, inputFile, '-T', profile, '-E', 'main']
 
     if mode == 'spirv':
-        compileCommmand += ['-target', 'spirv', '-profile', 'spirv_1_4']
+        compileCommmand += (['-spirv', '-fspv-target-env=vulkan1.3']) + \
+                           (['-fspv-extension=SPV_EXT_mesh_shader'] if useSpvExt else [])
+
     elif mode == 'dxil':
-        compileCommmand += ['-target', 'dxil', '-profile', dxilProfile]
+        pass # nothing extra needed
+
     elif mode == 'mtl':
-        compileCommmand += ['-target', 'metal'] # TODO
+        buildutils.printErr("unimplemented mtl shader compiler backend")
+
     else:
         buildutils.printErr(f'Unknown shader compile mode: {mode}')
         return False
 
-    compileCommmand += ['-entry', 'main', '-o', intermFile]
+    compileCommmand += ['-Fo', intermFile]
 
     if not buildutils.runCommand(
         compileCommmand,
@@ -64,10 +82,6 @@ def compileShader(
     os.remove(intermFile)
     return True
 
-FOLDER_STRUCTURE = buildutils.getFolderStructure(os.path.dirname(os.path.abspath(__file__)))
-MAIN_FILE_C   = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.c'
-MAIN_FILE_CXX = FOLDER_STRUCTURE.srcDir + 'zzzz_Unity.cpp'
-
 def recompileShaders() -> bool:
     success = True
 
@@ -77,7 +91,7 @@ def recompileShaders() -> bool:
         for file in files:
             fullPath = Path(root) / file
 
-            if not file.endswith('.slang'):
+            if not file.endswith('.hlsl'):
                 continue
 
             # SPIR-V
@@ -85,7 +99,7 @@ def recompileShaders() -> bool:
                 fullPath,
                 'spirv',
                 FOLDER_STRUCTURE.tmpDir,
-                str(fullPath).replace('.slang', '.spv.c')
+                str(fullPath).replace('.hlsl', '.spv.c')
             ):
                 success = False
 
@@ -94,7 +108,7 @@ def recompileShaders() -> bool:
                 fullPath,
                 'dxil',
                 FOLDER_STRUCTURE.tmpDir,
-                str(fullPath).replace('.slang', '.dxil.c')
+                str(fullPath).replace('.hlsl', '.dxil.c')
             ):
                 success = False
 

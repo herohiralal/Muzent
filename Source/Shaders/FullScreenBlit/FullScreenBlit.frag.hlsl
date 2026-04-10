@@ -1,6 +1,5 @@
 #include "FullScreenBlit.common.hlsl"
 
-[shader("fragment")]
 float4 main(VSOutput i)
     : SV_Target
 {
