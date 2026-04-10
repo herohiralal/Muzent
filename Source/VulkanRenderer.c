@@ -354,7 +354,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
     for (i64 i = 0; i < devices.count; i++)
     {
-        VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+        VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+
+        VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, .pNext = &meshFeatures};
         VkPhysicalDeviceVulkan12Features deviceFeatures12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &deviceFeatures13};
         VkPhysicalDeviceVulkan11Features deviceFeatures11 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, .pNext = &deviceFeatures12};
         VkPhysicalDeviceFeatures2 deviceFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, .pNext = &deviceFeatures11};
@@ -375,6 +377,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 "\tbuffer device address:                           $.\n"
                 "\tsynchronization 2:                               $.\n" // 1.3
                 "\tdynamic rendering:                               $.\n"
+                "\tmesh shaders:                                    $.\n" // VK_EXT_mesh_shader
+                "\ttask shaders:                                    $.\n"
             ),
             PNSLR_FmtArgs(
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
@@ -388,7 +392,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 PNSLR_FmtB8(!!deviceFeatures12.runtimeDescriptorArray),
                 PNSLR_FmtB8(!!deviceFeatures12.bufferDeviceAddress),
                 PNSLR_FmtB8(!!deviceFeatures13.synchronization2),
-                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering)
+                PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering),
+                PNSLR_FmtB8(!!meshFeatures.meshShader),
+                PNSLR_FmtB8(!!meshFeatures.taskShader)
             ),
             PNSLR_GET_LOC()
         );
@@ -404,7 +410,10 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             !!deviceFeatures12.runtimeDescriptorArray &&
             !!deviceFeatures12.bufferDeviceAddress &&
             !!deviceFeatures13.synchronization2 &&
-            !!deviceFeatures13.dynamicRendering)
+            !!deviceFeatures13.dynamicRendering &&
+            !!meshFeatures.meshShader &&
+            !!meshFeatures.taskShader &&
+            !!true)
         {
             selectedDevice = devices.data[i];
             break;
@@ -476,6 +485,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+        VK_EXT_MESH_SHADER_EXTENSION_NAME,
     };
 
     u32 enabledDeviceExtensionCount = sizeof(enabledDeviceExtensions) / sizeof(char*);
@@ -500,7 +510,14 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 .pNext           = &(VkPhysicalDeviceVulkan11Features)
                 {
                     .sType       = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-                    .pNext       = nil,
+                    .pNext       = &(VkPhysicalDeviceMeshShaderFeaturesEXT)
+                    {
+                        .sType   = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
+                        .pNext   = nil,
+
+                        .meshShader                        = VK_TRUE,
+                        .taskShader                        = VK_TRUE,
+                    },
 
                     .shaderDrawParameters                  = VK_TRUE,
                 },
