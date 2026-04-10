@@ -58,7 +58,7 @@ PNSLR_SUPPRESS_WARN
     #endif
 
     #include <combaseapi.h>
-    #include "Dependencies/d3dx12/directx/d3d12.h"
+    #include "Dependencies/d3d12/d3d12.h"
     #include <dxgi1_6.h>
     #include <d3dcompiler.h>
 
@@ -72,9 +72,9 @@ PNSLR_SUPPRESS_WARN
 
         #define D3DX12_NO_STATE_OBJECT_HELPERS
         #define D3DX12_NO_CHECK_FEATURE_SUPPORT_CLASS
-        #include "Dependencies/d3dx12/dxguids.cpp"
-        #include "Dependencies/d3dx12/d3dx12_property_format_table.cpp"
-        #include "Dependencies/d3dx12/directx/d3dx12.h"
+        #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
+        #include "Dependencies/d3d12/d3dx12/d3dx12.h"
+        #undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
         #undef D3DX12_NO_CHECK_FEATURE_SUPPORT_CLASS
         #undef D3DX12_NO_STATE_OBJECT_HELPERS
 
