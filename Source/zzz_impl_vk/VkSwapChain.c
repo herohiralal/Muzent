@@ -1,0 +1,294 @@
+#define MZNT_IMPLEMENTATION
+#include "VkFns.h"
+#if MZNT_VULKAN
+
+static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    VkSurfaceCapabilitiesKHR surfaceCaps;
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &surfaceCaps));
+
+    u32 imageCount = surfaceCaps.minImageCount + 1;
+    if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
+        imageCount = surfaceCaps.maxImageCount;
+
+    PNSLR_ArraySlice(VkSurfaceFormatKHR) formats;
+    {
+        u32 fmtCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(swapChain->renderer->physicalDevice, swapChain->surface, &fmtCount, nil));
+        formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(swapChain->renderer->physicalDevice, swapChain->surface, &fmtCount, formats.data));
+        formats.count = (i64) fmtCount;
+    }
+
+    u32 presentModesCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &presentModesCount, nil);
+    PNSLR_ArraySlice(VkPresentModeKHR) presentModes = PNSLR_MakeSlice(VkPresentModeKHR, presentModesCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &presentModesCount, presentModes.data);
+
+    VkPresentModeKHR selectedPresentMode = VK_PRESENT_MODE_FIFO_KHR; // always available
+    const VkPresentModeKHR preferredMode = cfg.vSync ? VK_PRESENT_MODE_MAILBOX_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR;
+    for (i64 i = 0; i < presentModes.count; i++)
+    {
+        if (presentModes.data[i] == preferredMode) // best quality
+        {
+            selectedPresentMode = preferredMode;
+            break;
+        }
+    }
+
+    swapChain->surfaceSize = surfaceCaps.currentExtent;
+    PNSLR_LogDf(PNSLR_StringLiteral("Swapchain extent: $x$"), PNSLR_FmtArgs(PNSLR_FmtU32(swapChain->surfaceSize.width, 0), PNSLR_FmtU32(swapChain->surfaceSize.height, 0)), PNSLR_GET_LOC());
+    VkSwapchainCreateInfoKHR swapchainCI = {
+        .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface          = swapChain->surface,
+        .minImageCount    = imageCount,
+        .imageFormat      = swapChain->surfaceFmt.format,
+        .imageColorSpace  = swapChain->surfaceFmt.colorSpace,
+        .imageExtent      = swapChain->surfaceSize,
+        .imageArrayLayers = 1,
+        .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .preTransform     = surfaceCaps.currentTransform,
+        .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode      = selectedPresentMode,
+        .clipped          = VK_TRUE,
+        .oldSwapchain     = swapChain->actual,
+    };
+
+    if (swapChain->renderer->gfxQueueFamilyIndex != swapChain->renderer->presQueueFamilyIndex)
+    {
+        swapchainCI.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
+        swapchainCI.queueFamilyIndexCount = 2;
+        swapchainCI.pQueueFamilyIndices   = (u32[]) {swapChain->renderer->gfxQueueFamilyIndex, swapChain->renderer->presQueueFamilyIndex};
+    }
+    else
+    {
+        swapchainCI.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
+        swapchainCI.queueFamilyIndexCount = 0;
+        swapchainCI.pQueueFamilyIndices   = nil;
+    }
+
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSwapchainKHR(swapChain->renderer->device, &swapchainCI, nil, &(swapChain->actual)));
+
+    if (swapchainCI.oldSwapchain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(swapChain->renderer->device, swapchainCI.oldSwapchain, nil);
+    }
+
+    swapChain->vSync          = cfg.vSync;
+    swapChain->framesInFlight = cfg.framesInFlight;
+
+    PNSLR_FreeSlice(&formats, tempAllocator, PNSLR_GET_LOC(), nil);
+}
+
+static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    vkDestroySwapchainKHR(swapChain->renderer->device, swapChain->actual, nil);
+}
+
+static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    // get swapchain images
+    {
+        u32 imgCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(swapChain->renderer->device, swapChain->actual, &imgCount, nil));
+        swapChain->imgs = PNSLR_MakeSlice(VkImage, imgCount, false, swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(swapChain->renderer->device, swapChain->actual, &imgCount, swapChain->imgs.data));
+        swapChain->imgs.count = (i64) imgCount;
+    }
+
+    {
+        swapChain->imgViews = PNSLR_MakeSlice(VkImageView, swapChain->imgs.count, false, swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+        for (i64 i = 0; i < swapChain->imgs.count; i++)
+        {
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateImageView(swapChain->renderer->device, &(VkImageViewCreateInfo)
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = swapChain->imgs.data[i],
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = swapChain->surfaceFmt.format,
+                .components = {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount = VK_REMAINING_ARRAY_LAYERS,
+                },
+            }, nil, &(swapChain->imgViews.data[i])));
+        }
+    }
+}
+
+static void MZNT_Internal_DestroyVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    for (i64 i = 0; i < swapChain->imgViews.count; i++)
+    {
+        vkDestroyImageView(swapChain->renderer->device, swapChain->imgViews.data[i], nil);
+    }
+
+    PNSLR_FreeSlice(&(swapChain->imgViews), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(swapChain->imgs), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+}
+
+MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    if (!renderer) return nil;
+
+    MZNT_VulkanSwapChain* output = PNSLR_New(MZNT_VulkanSwapChain, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    if (!output) FORCE_DBG_TRAP;
+
+    output->parent.type = MZNT_RendererType_Vulkan;
+    output->renderer    = renderer;
+
+    #if PNSLR_WINDOWS
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateWin32SurfaceKHR(renderer->instance, &(VkWin32SurfaceCreateInfoKHR)
+        {
+            .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+            .hinstance = (HINSTANCE)(uintptr_t) (renderer->parent.appHandle.handle),
+            .hwnd      = (HWND)(uintptr_t) (windowHandle.handle),
+        }, nil, &output->surface));
+    }
+    #elif PNSLR_ANDROID
+    {
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateAndroidSurfaceKHR(renderer->instance, &(VkAndroidSurfaceCreateInfoKHR)
+        {
+            .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+            .window = (ANativeWindow*) (windowHandle.handle),
+        }, nil, &output->surface));
+    }
+    #else
+    {
+        #error "unimplemented"
+    }
+    #endif
+
+    // select format type
+    {
+        u32 formatCount = 0;
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(output->renderer->physicalDevice, output->surface, &formatCount, nil));
+        PNSLR_ArraySlice(VkSurfaceFormatKHR) surfaceFormats = PNSLR_MakeSlice(VkSurfaceFormatKHR, formatCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(output->renderer->physicalDevice, output->surface, &formatCount, surfaceFormats.data));
+
+        if (formatCount == 0)
+        {
+            PNSLR_LogE(PNSLR_StringLiteral("Failed to get any surface formats for swapchain"), PNSLR_GET_LOC());
+            FORCE_DBG_TRAP;
+        }
+
+        output->surfaceFmt = surfaceFormats.data[0];
+        for (i64 i = 0; i < surfaceFormats.count; i++)
+        {
+            b8 preferredFormat = false;
+            #if PNSLR_DESKTOP
+            {
+                preferredFormat = (surfaceFormats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM) &&
+                    (surfaceFormats.data[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+            }
+            #elif PNSLR_ANDROID
+            {
+                preferredFormat = (surfaceFormats.data[i].format == VK_FORMAT_R8G8B8A8_UNORM);
+            }
+            #else
+            {
+                #error "unimplemented"
+            }
+            #endif
+
+            if (preferredFormat)
+            {
+                output->surfaceFmt = surfaceFormats.data[i];
+                break;
+            }
+        }
+
+        PNSLR_FreeSlice(&surfaceFormats, tempAllocator, PNSLR_GET_LOC(), nil);
+    }
+
+    MZNT_Internal_CreateVkSwapChain(output, cfg, tempAllocator);
+    MZNT_Internal_CreateVkSwapChainImagesAndViews(output, tempAllocator);
+
+    output->semIdx = U32_MAX;
+    output->curFrame = U32_MAX;
+
+    i64 imgCount = output->imgs.count;
+    output->presentCompleteSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    output->renderFinishedSemaphores = PNSLR_MakeSlice(VkSemaphore, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    output->inFlightFences = PNSLR_MakeSlice(VkFence, imgCount, false, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    for (i64 i = 0; i < imgCount; i++)
+    {
+        VkSemaphoreCreateInfo semaphoreCI = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSemaphore(renderer->device, &semaphoreCI, nil, &(output->presentCompleteSemaphores.data[i])));
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateSemaphore(renderer->device, &semaphoreCI, nil, &(output->renderFinishedSemaphores.data[i])));
+
+        VkFenceCreateInfo fenceCI = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
+    }
+
+    return output;
+}
+
+b8 MZNT_ReconfigureSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    if (!swapChain) return false;
+    if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    MZNT_WaitTillRendererIdle_Vulkan(swapChain->renderer);
+
+    MZNT_Internal_DestroyVkSwapChainImagesAndViews(swapChain, tempAllocator);
+
+    MZNT_Internal_CreateVkSwapChain(swapChain, cfg, tempAllocator);
+    MZNT_Internal_CreateVkSwapChainImagesAndViews(swapChain, tempAllocator);
+
+    return true;
+}
+
+b8 MZNT_DestroySwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    if (!swapChain) return false;
+    if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    MZNT_WaitTillRendererIdle_Vulkan(swapChain->renderer);
+
+    i64 imgCount = swapChain->imgs.count;
+    for (i32 i = 0; i < imgCount; i++)
+    {
+        vkDestroyFence(swapChain->renderer->device, swapChain->inFlightFences.data[i], nil);
+        vkDestroySemaphore(swapChain->renderer->device, swapChain->renderFinishedSemaphores.data[i], nil);
+        vkDestroySemaphore(swapChain->renderer->device, swapChain->presentCompleteSemaphores.data[i], nil);
+    }
+
+    PNSLR_FreeSlice(&(swapChain->renderFinishedSemaphores), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(swapChain->presentCompleteSemaphores), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    PNSLR_FreeSlice(&(swapChain->inFlightFences), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    MZNT_Internal_DestroyVkSwapChainImagesAndViews(swapChain, tempAllocator);
+    MZNT_Internal_DestroyVkSwapChain(swapChain, tempAllocator);
+
+    PNSLR_Delete(swapChain, swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+    return true;
+}
+
+MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(MZNT_VulkanSwapChain* swapChain)
+{
+    if (!swapChain) return MZNT_TextureFormat_Unknown;
+
+    MZNT_TextureFormat output = MZNT_Internal_MakeVkTextureFormat(swapChain->surfaceFmt.format);
+    if (output == MZNT_TextureFormat_Unknown) { FORCE_DBG_TRAP; }
+
+    return output;
+}
+
+u8 MZNT_IterateSwapChainAndGetIndex_Vulkan(MZNT_VulkanSwapChain* swapChain)
+{
+    if (!swapChain) return U8_MAX;
+    return 0;
+}
+
+#endif

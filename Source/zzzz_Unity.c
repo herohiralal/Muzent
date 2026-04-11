@@ -8,6 +8,7 @@
 #include "../../Panshilar/Source/zzzz_Unity.c"
 
 #include "Renderer.c"
-#include "zzz_impl_vk/VkRenderer.c"
+#include "zzz_impl_vk/zzz.c"
+#include "zzz_impl_dx12/zzz.c"
 
 #endif//MZNT_UNITY_C

@@ -1,5 +1,5 @@
-#ifndef MZNT_DX12_PRIVATE_H
-#define MZNT_DX12_PRIVATE_H
+#ifndef MZNT_DX12_RENDERER_H
+#define MZNT_DX12_RENDERER_H
 #include "../__Prelude.h"
 #include "../Renderer.h"
 EXTERN_C_BEGIN
@@ -95,6 +95,17 @@ b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, 
 
 MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
 b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocator tempAllocator);
+
+typedef struct MZNT_DirectX12SwapChain
+{
+    MZNT_SwapChain parent;
+} MZNT_DirectX12SwapChain;
+
+MZNT_DirectX12SwapChain* MZNT_CreateSwapChainFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator);
+b8 MZNT_ReconfigureSwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator);
+b8 MZNT_DestroySwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, PNSLR_Allocator tempAllocator);
+MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_DirectX12(MZNT_DirectX12SwapChain* swapChain);
+u8 MZNT_IterateSwapChainAndGetIndex_DirectX12(MZNT_DirectX12SwapChain* swapChain);
 
 #endif
 EXTERN_C_END

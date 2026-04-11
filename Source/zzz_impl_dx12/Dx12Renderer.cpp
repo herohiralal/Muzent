@@ -315,6 +315,8 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
 
 b8 MZNT_WaitTillRendererIdle_DirectX12(MZNT_DirectX12Renderer* renderer)
 {
+    if (!renderer || !(renderer->device) || !(renderer->cmdQueue)) return false;
+
     ID3D12Fence* fence = nil;
     MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 
@@ -941,6 +943,31 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
 
     MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, surface->nextFenceValue + 1));
     return true;
+}
+
+MZNT_DirectX12SwapChain* MZNT_CreateSwapChainFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    return nil;
+}
+
+b8 MZNT_ReconfigureSwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    return false;
+}
+
+b8 MZNT_DestroySwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    return false;
+}
+
+MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_DirectX12(MZNT_DirectX12SwapChain* swapChain)
+{
+     return MZNT_TextureFormat_Unknown;
+}
+
+u8 MZNT_IterateSwapChainAndGetIndex_DirectX12(MZNT_DirectX12SwapChain* swapChain)
+{
+    return U8_MAX;
 }
 
 #endif

@@ -1,10 +1,11 @@
-#ifndef MZNT_VULKAN_PRIVATE_H
-#define MZNT_VULKAN_PRIVATE_H
+#ifndef MZNT_VK_TYPES_H
+#define MZNT_VK_TYPES_H
 #include "../__Prelude.h"
 #include "../Renderer.h"
-EXTERN_C_BEGIN
 #if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
+EXTERN_C_BEGIN
 
+// vulkan array slices
 PNSLR_DECLARE_ARRAY_SLICE(VkLayerProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkExtensionProperties);
 PNSLR_DECLARE_ARRAY_SLICE(VkPhysicalDevice);
@@ -18,8 +19,10 @@ PNSLR_DECLARE_ARRAY_SLICE(VkPresentModeKHR);
 PNSLR_DECLARE_ARRAY_SLICE(VkFence);
 PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
 
+// vma array slices
 PNSLR_DECLARE_ARRAY_SLICE(VmaAllocation);
 
+// shader
 typedef struct MZNT_VulkanShader
 {
     VkShaderModule        vsModule;
@@ -30,7 +33,8 @@ typedef struct MZNT_VulkanShader
     VkPipeline            pipeline;
 } MZNT_VulkanShader;
 
-typedef struct MZNT_VulkanRenderer
+// renderer
+typedef struct alignas(64) MZNT_VulkanRenderer
 {
     MZNT_Renderer    parent;
     VkInstance       instance;
@@ -49,17 +53,48 @@ typedef struct MZNT_VulkanRenderer
     MZNT_VulkanShader helloTriangleMeshShadedProgram;
 } MZNT_VulkanRenderer;
 
-MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
-b8 MZNT_WaitTillRendererIdle_Vulkan(MZNT_VulkanRenderer* renderer);
-b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);
-
+// cmd buffer
 typedef struct MZNT_VulkanRendererCommandBuffer
 {
     MZNT_RendererCommandBuffer parent;
     MZNT_VulkanRenderer*       renderer;
+    VkCommandPool              cmdPool;
     VkCommandBuffer            cmdBuffer;
 } MZNT_VulkanRendererCommandBuffer;
 
+PNSLR_DECLARE_ARRAY_SLICE(MZNT_VulkanRendererCommandBuffer);
+
+// swap chain
+typedef struct alignas(64) MZNT_VulkanSwapChain
+{
+    MZNT_SwapChain       parent;
+    MZNT_VulkanRenderer* renderer;
+    VkSwapchainKHR       actual;
+
+    // cfg
+    b8 vSync;
+    u8 framesInFlight;
+
+    // surface info
+    VkSurfaceKHR         surface;
+    VkSurfaceFormatKHR   surfaceFmt;
+    VkExtent2D           surfaceSize;
+
+    // syncing
+    u32                           curFrame, semIdx, curImgIdx;
+    PNSLR_ArraySlice(VkSemaphore) presentCompleteSemaphores;
+    PNSLR_ArraySlice(VkSemaphore) renderFinishedSemaphores;
+    PNSLR_ArraySlice(VkFence)     inFlightFences;
+
+    // images
+    PNSLR_ArraySlice(VkImage)     imgs;
+    PNSLR_ArraySlice(VkImageView) imgViews;
+
+    // command buffers
+    PNSLR_ArraySlice(MZNT_VulkanRendererCommandBuffer) cmdBuffer;
+} MZNT_VulkanSwapChain;
+
+// surface
 typedef struct MZNT_VulkanRendererSurface
 {
     MZNT_RendererSurface parent;
@@ -68,7 +103,6 @@ typedef struct MZNT_VulkanRendererSurface
 
     // main vk objs
     VkSurfaceKHR  surface;
-    VkCommandPool cmdPool;
 
     // screen buffer
     PNSLR_ArraySlice(VkImage)       screenImages;
@@ -103,13 +137,6 @@ typedef struct MZNT_VulkanRendererSurface
     VkDescriptorSet   finalBlitDescriptorSets[MZNT_NUM_FRAMES_IN_FLIGHT];
 } MZNT_VulkanRendererSurface;
 
-MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
-b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
-b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
-
-MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
-b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
-
-#endif
 EXTERN_C_END
+#endif
 #endif

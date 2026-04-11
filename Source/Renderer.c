@@ -81,4 +81,50 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
+MZNT_RHI_FN_FOUR_ARG(
+    CreateSwapChainFromWindow,
+    (renderer ? renderer->type : 0),
+
+    MZNT_SwapChain*,             /* ret */ DYNA,
+    Renderer,                    renderer, DYNA,
+    MZNT_WindowHandle,           hnd,      STAT,
+    MZNT_SwapChainConfiguration, cfg,      STAT,
+    PNSLR_Allocator, t, STAT
+)
+
+MZNT_RHI_FN_THREE_ARG(
+    ReconfigureSwapChain,
+    (swapChain ? swapChain->type : 0),
+
+    b8,                          /* ret */  STAT,
+    SwapChain,                   swapChain, DYNA,
+    MZNT_SwapChainConfiguration, cfg,       STAT,
+    PNSLR_Allocator,             t,         STAT
+)
+
+MZNT_RHI_FN_TWO_ARG(
+    DestroySwapChain,
+    (swapChain ? swapChain->type : 0),
+
+    b8,              /* ret */  STAT,
+    SwapChain,       swapChain, DYNA,
+    PNSLR_Allocator, t,         STAT
+)
+
+MZNT_RHI_FN_ONE_ARG(
+    GetSwapChainTextureFormat,
+    (swapChain ? swapChain->type : 0),
+
+    MZNT_TextureFormat, /* ret */  STAT,
+    SwapChain,          swapChain, DYNA
+)
+
+MZNT_RHI_FN_ONE_ARG(
+    IterateSwapChainAndGetIndex,
+    (swapChain ? swapChain->type : 0),
+
+    u8,        /* ret */  STAT,
+    SwapChain, swapChain, DYNA
+)
+
 #include "DynamicDispatchSwitchboard/Disable.h"
