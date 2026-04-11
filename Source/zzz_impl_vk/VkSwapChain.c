@@ -11,15 +11,6 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
     if (surfaceCaps.maxImageCount > 0 && imageCount > surfaceCaps.maxImageCount)
         imageCount = surfaceCaps.maxImageCount;
 
-    PNSLR_ArraySlice(VkSurfaceFormatKHR) formats;
-    {
-        u32 fmtCount = 0;
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(swapChain->renderer->physicalDevice, swapChain->surface, &fmtCount, nil));
-        formats = PNSLR_MakeSlice(VkSurfaceFormatKHR, fmtCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
-        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceFormatsKHR(swapChain->renderer->physicalDevice, swapChain->surface, &fmtCount, formats.data));
-        formats.count = (i64) fmtCount;
-    }
-
     u32 presentModesCount = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &presentModesCount, nil);
     PNSLR_ArraySlice(VkPresentModeKHR) presentModes = PNSLR_MakeSlice(VkPresentModeKHR, presentModesCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
@@ -74,14 +65,64 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
         vkDestroySwapchainKHR(swapChain->renderer->device, swapchainCI.oldSwapchain, nil);
     }
 
-    swapChain->vSync          = cfg.vSync;
-    swapChain->framesInFlight = cfg.framesInFlight;
+    swapChain->vSync = cfg.vSync;
 
-    PNSLR_FreeSlice(&formats, tempAllocator, PNSLR_GET_LOC(), nil);
+    if (swapChain->framesInFlight != cfg.framesInFlight)
+    {
+        // destroy unneeded command buffers
+        for (i32 i = cfg.framesInFlight; i < swapChain->framesInFlight; i++)
+        {
+            vkFreeCommandBuffers(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, 1, &(swapChain->cmdBuffers.data[i].cmdBuffer));
+            vkDestroyCommandPool(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, nil);
+        }
+
+        // resize
+        PNSLR_ResizeSlice(
+            MZNT_VulkanRendererCommandBuffer,
+            &(swapChain->cmdBuffers),
+            cfg.framesInFlight,
+            false,
+            swapChain->renderer->parent.allocator,
+            PNSLR_GET_LOC(),
+            nil
+        );
+
+        // initialise new command buffers
+        for (i32 i = swapChain->framesInFlight; i < cfg.framesInFlight; i++)
+        {
+            swapChain->cmdBuffers.data[i].parent.type = MZNT_RendererType_Vulkan;
+            swapChain->cmdBuffers.data[i].renderer    = swapChain->renderer;
+
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(swapChain->renderer->device, &(VkCommandPoolCreateInfo)
+            {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                .flags = 0,
+                .queueFamilyIndex = swapChain->renderer->gfxQueueFamilyIndex,
+            }, nil, &(swapChain->cmdBuffers.data[i].cmdPool)));
+
+            MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(swapChain->renderer->device, &(VkCommandBufferAllocateInfo)
+            {
+                .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .commandPool        = swapChain->cmdBuffers.data[i].cmdPool,
+                .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                .commandBufferCount = 1,
+            }, &(swapChain->cmdBuffers.data[i].cmdBuffer)));
+        }
+
+        // update count
+        swapChain->framesInFlight = cfg.framesInFlight;
+    }
 }
 
 static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
 {
+    for (i32 i = 0; i < swapChain->framesInFlight; i++)
+    {
+        vkFreeCommandBuffers(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, 1, &(swapChain->cmdBuffers.data[i].cmdBuffer));
+        vkDestroyCommandPool(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, nil);
+    }
+    PNSLR_FreeSlice(&(swapChain->cmdBuffers), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
     vkDestroySwapchainKHR(swapChain->renderer->device, swapChain->actual, nil);
 }
 

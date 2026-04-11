@@ -91,7 +91,7 @@ typedef struct alignas(64) MZNT_VulkanSwapChain
     PNSLR_ArraySlice(VkImageView) imgViews;
 
     // command buffers
-    PNSLR_ArraySlice(MZNT_VulkanRendererCommandBuffer) cmdBuffer;
+    PNSLR_ArraySlice(MZNT_VulkanRendererCommandBuffer) cmdBuffers;
 } MZNT_VulkanSwapChain;
 
 // surface
