@@ -1470,6 +1470,14 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
 {
+    // DOING THESE SHENNANIGANS TO FIX MINIMISE ISSUES
+    {
+        VkSurfaceCapabilitiesKHR surfaceCaps = {0};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(surface->renderer->physicalDevice, surface->surface, &surfaceCaps));
+        if (!surfaceCaps.currentExtent.width && !surfaceCaps.currentExtent.height) // minimised window
+            return nil;
+    }
+
     // update swapchain indexing
     surface->semIdx = (surface->semIdx + 1) % (u32) surface->presentCompleteSemaphores.count;
     surface->curFrame = (surface->curFrame + 1) % MZNT_NUM_FRAMES_IN_FLIGHT;
