@@ -21,7 +21,7 @@
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullScreenBlitFS
 #include "../Shaders/FullScreenBlit/FullScreenBlit.frag.spv.c"
 
-VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
+static VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT types,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -127,7 +127,7 @@ static inline void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str f
     MZNT_Internal_LogVkResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())
 
 // returns number of unique queues
-PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(VkPhysicalDevice physDev, VkSurfaceKHR surfaceToPresent, u32* gfxQueue, u32* presQueue, PNSLR_Allocator tempAllocator)
+static PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(VkPhysicalDevice physDev, VkSurfaceKHR surfaceToPresent, u32* gfxQueue, u32* presQueue, PNSLR_Allocator tempAllocator)
 {
     if (!gfxQueue || !presQueue) FORCE_DBG_TRAP;
 
@@ -860,12 +860,11 @@ static void MZNT_Internal_CreateVkSwapchain(MZNT_VulkanRendererSurface* surface,
         .oldSwapchain     = surface->swapchain,
     };
 
-    u32 queueFamilyIndices[] = {surface->renderer->gfxQueueFamilyIndex, surface->renderer->presQueueFamilyIndex};
     if (surface->renderer->gfxQueueFamilyIndex != surface->renderer->presQueueFamilyIndex)
     {
         swapchainCI.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         swapchainCI.queueFamilyIndexCount = 2;
-        swapchainCI.pQueueFamilyIndices   = queueFamilyIndices;
+        swapchainCI.pQueueFamilyIndices   = (u32[]) {surface->renderer->gfxQueueFamilyIndex, surface->renderer->presQueueFamilyIndex};
     }
     else
     {
