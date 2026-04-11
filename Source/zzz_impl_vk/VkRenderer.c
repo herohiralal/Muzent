@@ -358,7 +358,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     VkPhysicalDevice selectedDevice = VK_NULL_HANDLE;
     for (i64 i = 0; i < devices.count; i++)
     {
-        VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+        VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptorBufferFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT};
+        VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT, .pNext = &descriptorBufferFeatures};
 
         VkPhysicalDeviceVulkan13Features deviceFeatures13 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, .pNext = &meshFeatures};
         VkPhysicalDeviceVulkan12Features deviceFeatures12 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, .pNext = &deviceFeatures13};
@@ -368,6 +369,31 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
         VkPhysicalDeviceProperties2 deviceProperties = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
         vkGetPhysicalDeviceProperties2(devices.data[i], &deviceProperties);
+
+        utf8str deviceTyStr = {0};
+        switch (deviceProperties.properties.deviceType)
+        {
+            case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+                deviceTyStr = PNSLR_StringLiteral("OTHER");
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                deviceTyStr = PNSLR_StringLiteral("INTEGRATED_GPU");
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                deviceTyStr = PNSLR_StringLiteral("DISCRETE_GPU");
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                deviceTyStr = PNSLR_StringLiteral("VIRTUAL_GPU");
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                deviceTyStr = PNSLR_StringLiteral("CPU");
+                break;
+
+            case VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM:
+            default:
+                deviceTyStr = PNSLR_StringLiteral("Unknown");
+                break;
+        }
 
         PNSLR_LogIf(
             PNSLR_StringLiteral(
@@ -383,10 +409,11 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 "\tdynamic rendering:                               $.\n"
                 "\tmesh shaders:                                    $.\n" // VK_EXT_mesh_shader
                 "\ttask shaders:                                    $.\n"
+                "\tdescriptor buffer:                               $.\n" // VK_EXT_descriptor_buffer
             ),
             PNSLR_FmtArgs(
                 PNSLR_FmtCString(deviceProperties.properties.deviceName),
-                PNSLR_FmtI32((i32) deviceProperties.properties.deviceType, 0),
+                PNSLR_FmtString(deviceTyStr),
 
                 PNSLR_FmtB8(!!deviceFeatures.features.samplerAnisotropy),
                 PNSLR_FmtB8(!!deviceFeatures11.shaderDrawParameters),
@@ -398,29 +425,29 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
                 PNSLR_FmtB8(!!deviceFeatures13.synchronization2),
                 PNSLR_FmtB8(!!deviceFeatures13.dynamicRendering),
                 PNSLR_FmtB8(!!meshFeatures.meshShader),
-                PNSLR_FmtB8(!!meshFeatures.taskShader)
+                PNSLR_FmtB8(!!meshFeatures.taskShader),
+                PNSLR_FmtB8(!!descriptorBufferFeatures.descriptorBuffer)
             ),
             PNSLR_GET_LOC()
         );
 
         // prefer discrete gpu on desktop
-        // want shader draw params
-        if ((!PNSLR_DESKTOP || deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) &&
-            !!deviceFeatures.features.samplerAnisotropy &&
-            !!deviceFeatures11.shaderDrawParameters &&
-            !!deviceFeatures12.descriptorIndexing &&
-            !!deviceFeatures12.shaderSampledImageArrayNonUniformIndexing &&
-            !!deviceFeatures12.descriptorBindingVariableDescriptorCount &&
-            !!deviceFeatures12.runtimeDescriptorArray &&
-            !!deviceFeatures12.bufferDeviceAddress &&
-            !!deviceFeatures13.synchronization2 &&
-            !!deviceFeatures13.dynamicRendering &&
-            !!meshFeatures.meshShader &&
-            !!meshFeatures.taskShader &&
-            !!true)
+        if ((!PNSLR_DESKTOP || deviceProperties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            && !!deviceFeatures.features.samplerAnisotropy
+            && !!deviceFeatures11.shaderDrawParameters
+            && !!deviceFeatures12.descriptorIndexing
+            && !!deviceFeatures12.shaderSampledImageArrayNonUniformIndexing
+            && !!deviceFeatures12.descriptorBindingVariableDescriptorCount
+            && !!deviceFeatures12.runtimeDescriptorArray
+            && !!deviceFeatures12.bufferDeviceAddress
+            && !!deviceFeatures13.synchronization2
+            && !!deviceFeatures13.dynamicRendering
+            && !!meshFeatures.meshShader
+            && !!meshFeatures.taskShader
+            && !!descriptorBufferFeatures.descriptorBuffer
+            && !!true)
         {
             selectedDevice = devices.data[i];
-            break;
         }
     }
 
