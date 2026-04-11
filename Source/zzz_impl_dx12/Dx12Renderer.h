@@ -37,6 +37,7 @@ typedef struct MZNT_DirectX12Renderer
 } MZNT_DirectX12Renderer;
 
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
+b8 MZNT_WaitTillRendererIdle_DirectX12(MZNT_DirectX12Renderer* renderer);
 b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Allocator tempAllocator);
 
 typedef struct MZNT_DirectX12RendererCommandBuffer

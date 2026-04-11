@@ -50,6 +50,7 @@ typedef struct MZNT_VulkanRenderer
 } MZNT_VulkanRenderer;
 
 MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
+b8 MZNT_WaitTillRendererIdle_Vulkan(MZNT_VulkanRenderer* renderer);
 b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator);
 
 typedef struct MZNT_VulkanRendererCommandBuffer

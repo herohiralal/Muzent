@@ -12,6 +12,14 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator,            tempAllocator, STAT
 )
 
+MZNT_RHI_FN_ONE_ARG(
+    WaitTillRendererIdle,
+    (renderer ? renderer->type : 0),
+
+    b8,       /* ret */ STAT,
+    Renderer, renderer, DYNA
+)
+
 MZNT_RHI_FN_TWO_ARG(
     DestroyRenderer,
     (renderer ? renderer->type : 0),

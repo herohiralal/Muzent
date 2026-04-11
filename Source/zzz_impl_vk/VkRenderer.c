@@ -804,11 +804,17 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     return output;
 }
 
+b8 MZNT_WaitTillRendererIdle_Vulkan(MZNT_VulkanRenderer* renderer)
+{
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
+    return true;
+}
+
 b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return false;
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(renderer->device));
+    MZNT_WaitTillRendererIdle_Vulkan(renderer);
 
     vkDestroyPipeline(renderer->device, renderer->helloTriangleMeshShadedProgram.pipeline, nil);
     vkDestroyPipelineLayout(renderer->device, renderer->helloTriangleMeshShadedProgram.pipelineLayout, nil);
@@ -1127,8 +1133,8 @@ MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_Vul
 
     MZNT_Internal_CreateVkSwapchainImagesAndViews(output, tempAllocator);
 
-    output->semIdx = 0;
-    output->curFrame = 0;
+    output->semIdx = U32_MAX;
+    output->curFrame = U32_MAX;
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(renderer->device, &(VkCommandPoolCreateInfo)
     {
@@ -1359,7 +1365,7 @@ b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkDeviceWaitIdle(surface->renderer->device));
+    MZNT_WaitTillRendererIdle_Vulkan(surface->renderer);
 
     vkFreeDescriptorSets(surface->renderer->device, surface->finalBlitDescriptorPool, MZNT_NUM_FRAMES_IN_FLIGHT, surface->finalBlitDescriptorSets);
     vkDestroyDescriptorPool(surface->renderer->device, surface->finalBlitDescriptorPool, nil);
@@ -1428,7 +1434,7 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
-    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueWaitIdle(surface->renderer->gfxQueue));
+    MZNT_WaitTillRendererIdle_Vulkan(surface->renderer);
 
     for (i64 i = 0; i < surface->swapchainImageViews.count; i++)
     {
@@ -1464,6 +1470,10 @@ b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 wi
 
 MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator)
 {
+    // update swapchain indexing
+    surface->semIdx = (surface->semIdx + 1) % (u32) surface->presentCompleteSemaphores.count;
+    surface->curFrame = (surface->curFrame + 1) % MZNT_NUM_FRAMES_IN_FLIGHT;
+
     MZNT_INTERNAL_VK_CHECKED_CALL(vkWaitForFences(surface->renderer->device, 1, &(surface->inFlightFences.data[surface->curFrame]), VK_TRUE, U64_MAX));
     MZNT_INTERNAL_VK_CHECKED_CALL(vkAcquireNextImageKHR(surface->renderer->device, surface->swapchain, U64_MAX, surface->presentCompleteSemaphores.data[surface->semIdx], VK_NULL_HANDLE, &(surface->curSwpchImgIdx)));
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetFences(surface->renderer->device, 1, &(surface->inFlightFences.data[surface->curFrame])));
@@ -1768,11 +1778,6 @@ b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tem
         .pImageIndices = &(surface->curSwpchImgIdx),
         .pResults = nil,
     }));
-
-    // update swapchain indexing
-    surface->semIdx = (surface->semIdx + 1) % (u32) surface->presentCompleteSemaphores.count;
-    surface->curFrame = (surface->curFrame + 1) % MZNT_NUM_FRAMES_IN_FLIGHT;
-    surface->curSwpchImgIdx = U32_MAX; // invalidate
 
     return true;
 }

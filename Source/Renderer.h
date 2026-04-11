@@ -60,14 +60,25 @@ typedef struct MZNT_Renderer
 } MZNT_Renderer;
 
 /**
+ * MAIN_THREAD
  * Creates a renderer instance based on the provided configuration.
  */
 MZNT_Renderer* MZNT_CreateRenderer(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
 
 /**
+ * MAIN_THREAD
  * Destroys the given renderer instance and frees associated resources.
  */
 b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
+
+/**
+ * THREAD_SAFE
+ * Halts the thread until all the work that's already submitted to the renderer is done.
+ * Return value is insignificant.
+ *
+ * Warning! - it won't necessarily account for work that gets submitted after this on other threads.
+ */
+b8 MZNT_WaitTillRendererIdle(MZNT_Renderer* renderer);
 
 //+skipreflect
 

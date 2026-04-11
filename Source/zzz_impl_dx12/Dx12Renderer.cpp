@@ -313,9 +313,31 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     return output;
 }
 
+b8 MZNT_WaitTillRendererIdle_DirectX12(MZNT_DirectX12Renderer* renderer)
+{
+    ID3D12Fence* fence = nil;
+    MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+
+    MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->cmdQueue->Signal(fence, 1));
+
+    if (fence->GetCompletedValue() < 1)
+    {
+        HANDLE fenceEvt = CreateEventA(nil, FALSE, FALSE, nil);
+        MZNT_INTERNAL_DX12_CHECKED_CALL(fence->SetEventOnCompletion(1, fenceEvt));
+        WaitForSingleObject(fenceEvt, INFINITE);
+        CloseHandle(fenceEvt);
+    }
+
+    fence->Release();
+
+    return true;
+}
+
 b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Allocator tempAllocator)
 {
     if (!renderer) return false;
+
+    MZNT_WaitTillRendererIdle_DirectX12(renderer);
 
     renderer->helloTriangleMeshShadedProgram.pipelineState->Release();
     renderer->helloTriangleMeshShadedProgram.rootSignature->Release();
@@ -368,18 +390,6 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     PNSLR_Delete(renderer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     return true;
-}
-
-static void MZNT_Internal_WaitForDx12GPUToBeIdle(MZNT_DirectX12RendererSurface* surface)
-{
-    UINT64 fenceValue = ++surface->nextFenceValue;
-    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, fenceValue));
-
-    if (surface->fence->GetCompletedValue() < fenceValue)
-    {
-        MZNT_INTERNAL_DX12_CHECKED_CALL(surface->fence->SetEventOnCompletion(fenceValue, surface->fenceEvent));
-        WaitForSingleObject(surface->fenceEvent, INFINITE);
-    }
 }
 
 static void MZNT_Internal_CreateFrameBufferAndViews(MZNT_DirectX12RendererSurface* surface)
@@ -613,7 +623,7 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
     }
 
     // fence, fence value, fence event
-    output->nextFenceValue = 0;
+    output->nextFenceValue = U64_MAX;
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
         output->frameFenceValues[i] = 0;
     MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&(output->fence))));
@@ -708,7 +718,7 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
 {
     if (!surface) return false;
 
-    MZNT_Internal_WaitForDx12GPUToBeIdle(surface);
+    MZNT_WaitTillRendererIdle_DirectX12(surface->renderer);
 
     surface->finalBlitShader.pipelineState->Release();
     surface->finalBlitShader.rootSignature->Release();
@@ -760,13 +770,15 @@ b8 MZNT_ResizeRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface, 
     if (!surface) return false;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
-    MZNT_Internal_WaitForDx12GPUToBeIdle(surface);
+    MZNT_WaitTillRendererIdle_DirectX12(surface->renderer);
 
     // release render target views
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
     {
         surface->depthBuffer[i]->Release();
+        surface->depthBufferAllocations[i]->Release();
         surface->screenBuffer[i]->Release();
+        surface->screenBufferAllocations[i]->Release();
         surface->swapchainRTs[i]->Release();
     }
 
@@ -791,6 +803,8 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
     if (!surface) return nil;
     if (!surface->renderer) FORCE_DBG_TRAP;
 
+    surface->nextFenceValue++;
+    surface->frameFenceValues[surface->curFrame] = surface->nextFenceValue;
     surface->curFrame = surface->swapchain->GetCurrentBackBufferIndex();
 
     if (surface->fence->GetCompletedValue() < surface->frameFenceValues[surface->curFrame])
@@ -925,9 +939,7 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
     // present
     MZNT_INTERNAL_DX12_CHECKED_CALL(surface->swapchain->Present(1, 0));
 
-    surface->nextFenceValue++;
-    surface->frameFenceValues[surface->curFrame] = surface->nextFenceValue;
-    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, surface->nextFenceValue));
+    MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, surface->nextFenceValue + 1));
     return true;
 }
 
