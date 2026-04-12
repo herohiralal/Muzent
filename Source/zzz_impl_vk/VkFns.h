@@ -27,13 +27,6 @@ b8 MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator
 MZNT_VulkanRendererCommandBuffer* MZNT_GetSwapChainCommandBuffer_Vulkan(const MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator);
 b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator);
 
-MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);
-b8 MZNT_DestroyRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
-b8 MZNT_ResizeRendererSurface_Vulkan(MZNT_VulkanRendererSurface* surface, u16 width, u16 height, PNSLR_Allocator tempAllocator);
-
-MZNT_VulkanRendererCommandBuffer* MZNT_BeginFrame_Vulkan(MZNT_VulkanRendererSurface* surface, f32 r, f32 g, f32 b, f32 a, PNSLR_Allocator tempAllocator);
-b8 MZNT_EndFrame_Vulkan(MZNT_VulkanRendererSurface* surface, PNSLR_Allocator tempAllocator);
-
 #endif
 EXTERN_C_END
 #endif

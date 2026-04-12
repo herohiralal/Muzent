@@ -22,17 +22,6 @@ PNSLR_DECLARE_ARRAY_SLICE(VkSemaphore);
 // vma array slices
 PNSLR_DECLARE_ARRAY_SLICE(VmaAllocation);
 
-// shader
-typedef struct MZNT_VulkanShader
-{
-    VkShaderModule        vsModule;
-    VkShaderModule        msModule;
-    VkShaderModule        fsModule;
-    VkDescriptorSetLayout descriptorSetLayout;
-    VkPipelineLayout      pipelineLayout;
-    VkPipeline            pipeline;
-} MZNT_VulkanShader;
-
 // renderer
 typedef struct alignas(64) MZNT_VulkanRenderer
 {
@@ -48,20 +37,9 @@ typedef struct alignas(64) MZNT_VulkanRenderer
     VkDebugUtilsMessengerEXT debugMessenger;
 
     VmaAllocator     vmaAllocator;
-
-    MZNT_VulkanShader helloTriangleVertexShadedProgram;
-    MZNT_VulkanShader helloTriangleMeshShadedProgram;
 } MZNT_VulkanRenderer;
 
-// cmd buffer
-typedef struct MZNT_VulkanRendererCommandBuffer
-{
-    MZNT_RendererCommandBuffer parent;
-    MZNT_VulkanRenderer*       renderer;
-    VkCommandPool              cmdPool;
-    VkCommandBuffer            cmdBuffer;
-} MZNT_VulkanRendererCommandBuffer;
-
+typedef struct MZNT_VulkanRendererCommandBuffer MZNT_VulkanRendererCommandBuffer;
 PNSLR_DECLARE_ARRAY_SLICE(MZNT_VulkanRendererCommandBuffer);
 
 // swap chain
@@ -95,48 +73,14 @@ typedef struct alignas(64) MZNT_VulkanSwapChain
     PNSLR_ArraySlice(MZNT_VulkanRendererCommandBuffer) cmdBuffers;
 } MZNT_VulkanSwapChain;
 
-// surface
-typedef struct MZNT_VulkanRendererSurface
+// cmd buffer
+struct MZNT_VulkanRendererCommandBuffer
 {
-    MZNT_RendererSurface parent;
-
-    MZNT_VulkanRenderer* renderer; // owning renderer instance
-
-    // main vk objs
-    VkSurfaceKHR  surface;
-
-    // screen buffer
-    PNSLR_ArraySlice(VkImage)       screenImages;
-    PNSLR_ArraySlice(VmaAllocation) screenImageAllocations;
-    PNSLR_ArraySlice(VkImageView)   screenImageViews;
-
-    // depth stuff
-    PNSLR_ArraySlice(VkImage)       depthImages;
-    PNSLR_ArraySlice(VmaAllocation) depthImageAllocations;
-    PNSLR_ArraySlice(VkImageView)   depthImageViews;
-
-    // swapchain and related
-    VkSwapchainKHR                swapchain;
-    VkExtent2D                    swapchainExtent;
-    VkSurfaceFormatKHR            swapchainImageFormat;
-    PNSLR_ArraySlice(VkImage)     swapchainImages;
-    PNSLR_ArraySlice(VkImageView) swapchainImageViews;
-
-    // synchronization
-    u32                              curFrame;
-    u32                              semIdx;
-    u32                              curSwpchImgIdx;
-    MZNT_VulkanRendererCommandBuffer commandBuffers[MZNT_NUM_FRAMES_IN_FLIGHT];
-    PNSLR_ArraySlice(VkSemaphore)    presentCompleteSemaphores;
-    PNSLR_ArraySlice(VkSemaphore)    renderFinishedSemaphores;
-    PNSLR_ArraySlice(VkFence)        inFlightFences;
-
-    // shaders
-    MZNT_VulkanShader finalBlitShader;
-    VkSampler         finalBlitSampler;
-    VkDescriptorPool  finalBlitDescriptorPool;
-    VkDescriptorSet   finalBlitDescriptorSets[MZNT_NUM_FRAMES_IN_FLIGHT];
-} MZNT_VulkanRendererSurface;
+    MZNT_RendererCommandBuffer parent;
+    MZNT_VulkanRenderer*       renderer;
+    VkCommandPool              cmdPool;
+    VkCommandBuffer            cmdBuffer;
+};
 
 EXTERN_C_END
 #endif
