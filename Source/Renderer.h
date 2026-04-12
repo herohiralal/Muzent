@@ -163,19 +163,27 @@ MZNT_TextureFormat MZNT_GetSwapChainTextureFormat(MZNT_SwapChain* swapChain);
 
 /**
  * MAIN_THREAD
- * Acquire the next image in the swap-chain, and get its associated command buffer
- * Optionally, also get the image index, to cross-check with your own custom
- * per-frame-in-flight allocated resources.
- *
- * Warning! - the output could be nil, in some cases (like window is minimsed).
- * In this case, image index will be 255.
+ * Acquire the next image in the swap-chain. Will block if there is something to block
+ * over (such as the next image being presented, or the new command buffer not done
+ * processing yet from the last time it was used).
  */
-MZNT_RendererCommandBuffer* MZNT_IterateSwapChain(MZNT_SwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator);
+b8 MZNT_IterateSwapChain(MZNT_SwapChain* swapChain, PNSLR_Allocator tempAllocator);
 
 /**
  * RENDER_THREAD
- * Wrap up recording commands for the swap-chain and submit the current image
- * for presenting.
+ * Acquire the command buffer for the current swap-chain image.
+ * Optionally, also acquire the index of the current image in the frames-in-flight buffer.
+ * This index can be used to determine external per-frame-in-flight resource usage.
+ */
+MZNT_RendererCommandBuffer* MZNT_GetSwapChainCommandBuffer(
+    MZNT_SwapChain* swapChain,
+    u8* outImgIdx,
+    PNSLR_Allocator tempAllocator);
+
+/**
+ * RENDER_THREAD
+ * Wrap up recording commands for the current frame, for the given swap-chain and
+ * submit the current image for presenting.
  */
 b8 MZNT_PresentSwapChain(MZNT_SwapChain* swapChain, PNSLR_Allocator tempAllocator);
 

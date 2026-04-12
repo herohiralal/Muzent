@@ -23,7 +23,8 @@ MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer*
 b8 MZNT_ReconfigureSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator);
 b8 MZNT_DestroySwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator);
 MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(const MZNT_VulkanSwapChain* swapChain);
-MZNT_VulkanRendererCommandBuffer* MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator);
+b8 MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator);
+MZNT_VulkanRendererCommandBuffer* MZNT_GetSwapChainCommandBuffer_Vulkan(const MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator);
 b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator);
 
 MZNT_VulkanRendererSurface* MZNT_CreateRendererSurfaceFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, PNSLR_Allocator tempAllocator);

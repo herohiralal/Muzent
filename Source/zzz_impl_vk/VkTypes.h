@@ -81,6 +81,7 @@ typedef struct alignas(64) MZNT_VulkanSwapChain
     VkExtent2D           surfaceSize;
 
     // syncing
+    b8                            noCmdBufThisFrame;
     u32                           curFrame, semIdx, curImgIdx;
     PNSLR_ArraySlice(VkSemaphore) presentCompleteSemaphores;
     PNSLR_ArraySlice(VkSemaphore) renderFinishedSemaphores;

@@ -67,8 +67,17 @@ MZNT_RHI_FN_ONE_ARG(
     SwapChain,          swapChain, DYNA
 )
 
-MZNT_RHI_FN_THREE_ARG(
+MZNT_RHI_FN_TWO_ARG(
     IterateSwapChain,
+    (swapChain ? swapChain->type : 0),
+
+    b8,              /* ret */  STAT,
+    SwapChain,       swapChain, DYNA,
+    PNSLR_Allocator, t,         STAT
+)
+
+MZNT_RHI_FN_THREE_ARG(
+    GetSwapChainCommandBuffer,
     (swapChain ? swapChain->type : 0),
 
     MZNT_RendererCommandBuffer*, /* ret */  DYNA,

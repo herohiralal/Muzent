@@ -327,21 +327,19 @@ MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(const MZNT_VulkanSwapCh
     return output;
 }
 
-MZNT_VulkanRendererCommandBuffer* MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator)
+b8 MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
 {
-    u8 outImgIdxThrowaway = 0;
-    outImgIdx = outImgIdx ? outImgIdx : &outImgIdxThrowaway;
-    *outImgIdx = U8_MAX;
-
-    if (!swapChain) return nil;
+    if (!swapChain) return false;
     if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    swapChain->noCmdBufThisFrame = true;
 
     // DOING THESE SHENNANIGANS TO FIX MINIMISE ISSUES
     {
         VkSurfaceCapabilitiesKHR surfaceCaps = {0};
         MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &surfaceCaps));
         if (!surfaceCaps.currentExtent.width && !surfaceCaps.currentExtent.height) // minimised window
-            return nil;
+            return false;
     }
 
     // update swapchain indexing
@@ -371,6 +369,21 @@ MZNT_VulkanRendererCommandBuffer* MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapCh
         swapChain->renderer->device,
         1, &(swapChain->inFlightFences.data[swapChain->curFrame]) // reset fences
     ));
+
+    swapChain->noCmdBufThisFrame = false;
+    return true;
+}
+
+MZNT_VulkanRendererCommandBuffer* MZNT_GetSwapChainCommandBuffer_Vulkan(const MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator)
+{
+    u8 outImgIdxThrowaway = 0;
+    outImgIdx = outImgIdx ? outImgIdx : &outImgIdxThrowaway;
+    *outImgIdx = U8_MAX;
+
+    if (swapChain->noCmdBufThisFrame)
+    {
+        return nil;
+    }
 
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[swapChain->curFrame]);
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandPool(swapChain->renderer->device, cmdBuf->cmdPool, 0));
