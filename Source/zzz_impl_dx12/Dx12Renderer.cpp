@@ -26,8 +26,8 @@ static void __stdcall MZNT_Internal_Dx12DebugCallback(
     D3D12_MESSAGE_CATEGORY category,
     D3D12_MESSAGE_SEVERITY severity,
     D3D12_MESSAGE_ID id,
-    LPCSTR pDescription,
-    void* pContext)
+    LPCSTR desc,
+    void* ctx)
 {
     utf8str categoryStr = { };
     switch (category)
@@ -57,10 +57,11 @@ static void __stdcall MZNT_Internal_Dx12DebugCallback(
         default:                                lvl = PNSLR_LoggerLevel_Error;    break;
     }
 
-    PNSLR_Logf(lvl, PNSLR_StringLiteral("D3D12 INFO QUEUE: $ $"),
+    PNSLR_Logf(lvl, PNSLR_StringLiteral("D3D12 INFO QUEUE: $ $ (message id - $)"),
         PNSLR_FmtArgs(
-            PNSLR_FmtCString((cstring) pDescription),
+            PNSLR_FmtCString((cstring) desc),
             PNSLR_FmtString(categoryStr),
+            PNSLR_FmtU32((u32) id)
         ),
         PNSLR_GET_LOC()
     );
