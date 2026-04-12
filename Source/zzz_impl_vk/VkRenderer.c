@@ -699,7 +699,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
     return output;
 }
 
-b8 MZNT_WaitTillRendererIdle_Vulkan(MZNT_VulkanRenderer* renderer)
+b8 MZNT_WaitTillRendererIdle_Vulkan(const MZNT_VulkanRenderer* renderer)
 {
     if (!renderer || !(renderer->device)) return false;
 

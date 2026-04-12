@@ -316,7 +316,7 @@ b8 MZNT_DestroySwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator
     return true;
 }
 
-MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(MZNT_VulkanSwapChain* swapChain)
+MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(const MZNT_VulkanSwapChain* swapChain)
 {
     if (!swapChain) return MZNT_TextureFormat_Unknown;
 
@@ -326,10 +326,121 @@ MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_Vulkan(MZNT_VulkanSwapChain* s
     return output;
 }
 
-u8 MZNT_IterateSwapChainAndGetIndex_Vulkan(MZNT_VulkanSwapChain* swapChain)
+MZNT_VulkanRendererCommandBuffer* MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator)
 {
-    if (!swapChain) return U8_MAX;
-    return 0;
+    u8 outImgIdxThrowaway = 0;
+    outImgIdx = outImgIdx ? outImgIdx : &outImgIdxThrowaway;
+    *outImgIdx = U8_MAX;
+
+    if (!swapChain) return nil;
+    if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    // DOING THESE SHENNANIGANS TO FIX MINIMISE ISSUES
+    {
+        VkSurfaceCapabilitiesKHR surfaceCaps = {0};
+        MZNT_INTERNAL_VK_CHECKED_CALL(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(swapChain->renderer->physicalDevice, swapChain->surface, &surfaceCaps));
+        if (!surfaceCaps.currentExtent.width && !surfaceCaps.currentExtent.height) // minimised window
+            return nil;
+    }
+
+    // update swapchain indexing
+    swapChain->semIdx = (swapChain->semIdx + 1) % (u32) swapChain->presentCompleteSemaphores.count;
+    swapChain->curFrame = (swapChain->curFrame + 1) % swapChain->framesInFlight;
+
+    // wait on submission of the new frame's command buffer
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkWaitForFences(
+        swapChain->renderer->device,
+        1, &(swapChain->inFlightFences.data[swapChain->curFrame]), // fences to wait on
+        VK_TRUE, // wait all
+        U64_MAX // timeout
+    ));
+
+    // get the next image, and wait if the image of that is still processing
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkAcquireNextImageKHR(
+        swapChain->renderer->device,
+        swapChain->actual,
+        U64_MAX, // timeout
+        swapChain->presentCompleteSemaphores.data[swapChain->semIdx],
+        VK_NULL_HANDLE, // fence
+        &(swapChain->curImgIdx)
+    ));
+
+    // reset the fences, so they can be used again, once submission is done
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkResetFences(
+        swapChain->renderer->device,
+        1, &(swapChain->inFlightFences.data[swapChain->curFrame]) // reset fences
+    ));
+
+    MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[swapChain->curFrame]);
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandPool(swapChain->renderer->device, cmdBuf->cmdPool, 0));
+
+    *outImgIdx = (u8) swapChain->curFrame;
+    return cmdBuf;
+}
+
+b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+{
+    if (!swapChain) return false;
+    if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[swapChain->curFrame]);
+
+    // command buffer over
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
+
+    // command buffer over
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkEndCommandBuffer(cmdBuf->cmdBuffer));
+
+    // submit command buffer
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueueSubmit2(swapChain->renderer->gfxQueue, 1, &(VkSubmitInfo2)
+    {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .pNext = nil,
+        .flags = 0,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos    = (VkSemaphoreSubmitInfo[])
+        {
+            {
+                .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = swapChain->presentCompleteSemaphores.data[swapChain->semIdx],
+                .value     = 1,
+                .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            },
+        },
+        .commandBufferInfoCount = 1,
+        .pCommandBufferInfos    = (VkCommandBufferSubmitInfo[])
+        {
+            {
+                .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+                .commandBuffer = cmdBuf->cmdBuffer,
+            },
+        },
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos    = (VkSemaphoreSubmitInfo[])
+        {
+            {
+                .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+                .semaphore = swapChain->renderFinishedSemaphores.data[swapChain->curImgIdx],
+                .value     = 1,
+                .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            },
+        },
+    }, swapChain->inFlightFences.data[swapChain->curFrame]));
+
+    // present
+    MZNT_INTERNAL_VK_CHECKED_CALL(vkQueuePresentKHR(swapChain->renderer->gfxQueue, &(VkPresentInfoKHR)
+    {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nil,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &(swapChain->renderFinishedSemaphores.data[swapChain->curImgIdx]),
+        .swapchainCount = 1,
+        .pSwapchains = &(swapChain->actual),
+        .pImageIndices = &(swapChain->curImgIdx),
+        .pResults = nil,
+    }));
+
+    return true;
 }
 
 #endif

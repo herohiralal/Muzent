@@ -190,11 +190,21 @@ MZNT_TextureFormat MZNT_GetSwapChainTextureFormat(MZNT_SwapChain* swapChain);
 
 /**
  * MAIN_THREAD
- * Acquire the next image in the swap-chain.
- * Returns 255 to indicate that this operation was not valid.
- * A common example is if the window is minimised.
+ * Acquire the next image in the swap-chain, and get its associated command buffer
+ * Optionally, also get the image index, to cross-check with your own custom
+ * per-frame-in-flight allocated resources.
+ *
+ * Warning! - the output could be nil, in some cases (like window is minimsed).
+ * In this case, image index will be 255.
  */
-u8 MZNT_IterateSwapChainAndGetIndex(MZNT_SwapChain* swapChain);
+MZNT_RendererCommandBuffer* MZNT_IterateSwapChain(MZNT_SwapChain* swapChain, u8* outImgIdx, PNSLR_Allocator tempAllocator);
+
+/**
+ * RENDER_THREAD
+ * Wrap up recording commands for the swap-chain and submit the current image
+ * for presenting.
+ */
+b8 MZNT_PresentSwapChain(MZNT_SwapChain* swapChain, PNSLR_Allocator tempAllocator);
 
 EXTERN_C_END
 #endif // MZNT_RENDERER_H ==========================================================
