@@ -29,58 +29,6 @@ MZNT_RHI_FN_TWO_ARG(
     PNSLR_Allocator, tempAllocator, STAT
 )
 
-MZNT_RHI_FN_THREE_ARG(
-    CreateRendererSurfaceFromWindow,
-    (renderer ? renderer->type : 0),
-
-    MZNT_RendererSurface*, /* ret */      DYNA,
-    Renderer,              renderer,      DYNA,
-    MZNT_WindowHandle,     windowHandle,  STAT,
-    PNSLR_Allocator,       tempAllocator, STAT
-)
-
-MZNT_RHI_FN_TWO_ARG(
-    DestroyRendererSurface,
-    (surface ? surface->type : 0),
-
-    b8,              /* ret */      STAT,
-    RendererSurface, surface,       DYNA,
-    PNSLR_Allocator, tempAllocator, STAT
-)
-
-MZNT_RHI_FN_FOUR_ARG(
-    ResizeRendererSurface,
-    (surface ? surface->type : 0),
-
-    b8,              /* ret */      STAT,
-    RendererSurface, surface,       DYNA,
-    u16,             width,         STAT,
-    u16,             height,        STAT,
-    PNSLR_Allocator, tempAllocator, STAT
-)
-
-MZNT_RHI_FN_SIX_ARG(
-    BeginFrame,
-    (surface ? surface->type : 0),
-
-    MZNT_RendererCommandBuffer*, /* ret */      DYNA,
-    RendererSurface,             surface,       DYNA,
-    f32,                         r,             STAT,
-    f32,                         g,             STAT,
-    f32,                         b,             STAT,
-    f32,                         a,             STAT,
-    PNSLR_Allocator,             tempAllocator, STAT
-)
-
-MZNT_RHI_FN_TWO_ARG(
-    EndFrame,
-    (surface ? surface->type : 0),
-
-    b8,              /* ret */      STAT,
-    RendererSurface, surface,       DYNA,
-    PNSLR_Allocator, tempAllocator, STAT
-)
-
 MZNT_RHI_FN_FOUR_ARG(
     CreateSwapChainFromWindow,
     (renderer ? renderer->type : 0),
