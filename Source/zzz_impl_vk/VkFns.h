@@ -6,7 +6,7 @@
 EXTERN_C_BEGIN
 #if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
 
-inline PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void);
+PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void);
 void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc);
 
 #define MZNT_INTERNAL_VK_CHECKED_CALL(call) \

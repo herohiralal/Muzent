@@ -3,5 +3,5 @@
 #include "../__Prelude.h"
 #include "../Renderer.h"
 #include "Dx12Types.h"
-#include "Dx12Renderer.h"
+#include "Dx12Fns.h"
 #endif

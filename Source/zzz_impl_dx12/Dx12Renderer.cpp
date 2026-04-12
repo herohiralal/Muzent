@@ -1,5 +1,5 @@
 #define MZNT_IMPLEMENTATION
-#include "Dx12Renderer.h"
+#include "Dx12Fns.h"
 #if MZNT_DX12
 
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleVS
@@ -21,112 +21,6 @@
 #define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitFS
 #include "../Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
 #undef INLINED_FILE_INCLUSION_NAME
-
-static void __stdcall MZNT_Internal_Dx12DebugCallback(
-    D3D12_MESSAGE_CATEGORY category,
-    D3D12_MESSAGE_SEVERITY severity,
-    D3D12_MESSAGE_ID id,
-    LPCSTR desc,
-    void* ctx)
-{
-    utf8str categoryStr = { };
-    switch (category)
-    {
-        case D3D12_MESSAGE_CATEGORY_APPLICATION_DEFINED:   categoryStr = PNSLR_StringLiteral("[ApplicationDefined]");   break;
-        case D3D12_MESSAGE_CATEGORY_MISCELLANEOUS:         categoryStr = PNSLR_StringLiteral("[Miscellaneous]");        break;
-        case D3D12_MESSAGE_CATEGORY_INITIALIZATION:        categoryStr = PNSLR_StringLiteral("[Initialization]");       break;
-        case D3D12_MESSAGE_CATEGORY_CLEANUP:               categoryStr = PNSLR_StringLiteral("[Cleanup]");              break;
-        case D3D12_MESSAGE_CATEGORY_COMPILATION:           categoryStr = PNSLR_StringLiteral("[Compilation]");          break;
-        case D3D12_MESSAGE_CATEGORY_STATE_CREATION:        categoryStr = PNSLR_StringLiteral("[StateCreation]");        break;
-        case D3D12_MESSAGE_CATEGORY_STATE_SETTING:         categoryStr = PNSLR_StringLiteral("[StateSetting]");         break;
-        case D3D12_MESSAGE_CATEGORY_STATE_GETTING:         categoryStr = PNSLR_StringLiteral("[StateGetting]");         break;
-        case D3D12_MESSAGE_CATEGORY_RESOURCE_MANIPULATION: categoryStr = PNSLR_StringLiteral("[ResourceManipulation]"); break;
-        case D3D12_MESSAGE_CATEGORY_EXECUTION:             categoryStr = PNSLR_StringLiteral("[Execution]");            break;
-        case D3D12_MESSAGE_CATEGORY_SHADER:                categoryStr = PNSLR_StringLiteral("[Shader]");               break;
-        default:                                           categoryStr = PNSLR_StringLiteral("[Unknown]");              break;
-    }
-
-    PNSLR_LoggerLevel lvl = 0;
-    switch (severity)
-    {
-        case D3D12_MESSAGE_SEVERITY_CORRUPTION: lvl = PNSLR_LoggerLevel_Critical; break;
-        case D3D12_MESSAGE_SEVERITY_ERROR:      lvl = PNSLR_LoggerLevel_Error;    break;
-        case D3D12_MESSAGE_SEVERITY_WARNING:    lvl = PNSLR_LoggerLevel_Warn;     break;
-        case D3D12_MESSAGE_SEVERITY_INFO:       lvl = PNSLR_LoggerLevel_Info;     break;
-        case D3D12_MESSAGE_SEVERITY_MESSAGE:    lvl = PNSLR_LoggerLevel_Debug;    break;
-        default:                                lvl = PNSLR_LoggerLevel_Error;    break;
-    }
-
-    PNSLR_Logf(lvl, PNSLR_StringLiteral("D3D12 INFO QUEUE: $ $ (message id - $)"),
-        PNSLR_FmtArgs(
-            PNSLR_FmtCString((cstring) desc),
-            PNSLR_FmtString(categoryStr),
-            PNSLR_FmtU32((u32) id)
-        ),
-        PNSLR_GET_LOC()
-    );
-}
-
-static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
-{
-    if (SUCCEEDED(result)) return;
-    utf8str message = {0};
-    switch (result)
-    {
-        case D3D12_ERROR_ADAPTER_NOT_FOUND: message = Panshilar::StringLiteral("\"The specified cached PSO was created on a different adapter and cannot be reused on the current adapter.\""); break;
-        case D3D12_ERROR_DRIVER_VERSION_MISMATCH: message = Panshilar::StringLiteral("\"The specified cached PSO was created on a different driver version and cannot be reused on the current adapter.\""); break;
-        case DXGI_ERROR_INVALID_CALL: message = Panshilar::StringLiteral("\"The method call is invalid. For example, a method's parameter may not be a valid pointer.\""); break;
-        case DXGI_ERROR_WAS_STILL_DRAWING: message = Panshilar::StringLiteral("\"The previous blit operation that is transferring information to or from this surface is incomplete.\""); break;
-        case E_FAIL: message = Panshilar::StringLiteral("\"Attempted to create a device with the debug layer enabled and the layer is not installed.\""); break;
-        case E_INVALIDARG: message = Panshilar::StringLiteral("\"An invalid parameter was passed to the returning function.\""); break;
-        case E_OUTOFMEMORY: message = Panshilar::StringLiteral("\"Direct3D could not allocate sufficient memory to complete the call.\""); break;
-        case E_NOTIMPL: message = Panshilar::StringLiteral("\"The method call isn't implemented with the passed parameter combination.\""); break;
-        case S_FALSE: message = Panshilar::StringLiteral("\"Alternate success value, indicating a successful but nonstandard completion (the precise meaning depends on context).\""); break;
-        default: message = Panshilar::StringLiteral("\"An unknown error occurred.\""); break;
-    }
-
-    if (result != S_OK)
-    {
-        PNSLR_LogEf(Panshilar::StringLiteral("DirectX 12 error: $ from $."),
-                    PNSLR_FmtArgs(
-                        PNSLR_FmtString(message),
-                        PNSLR_FmtString(fnCall)
-                    ),
-                    loc);
-
-        FORCE_DBG_TRAP;
-    }
-}
-
-static inline void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR_SourceCodeLocation loc)
-{
-    if (!blob) return;
-
-    utf8str blobMsg = { };
-    blobMsg.data  = (u8*) blob->GetBufferPointer();
-    blobMsg.count = (i64) blob->GetBufferSize();
-
-    if (blobMsg.data && blobMsg.data[blobMsg.count - 1] == '\0')
-    {
-        // trim null terminator from message for cleaner logging
-        blobMsg.count -= 1;
-    }
-
-    PNSLR_LogEf(Panshilar::StringLiteral("[$]: $"),
-                PNSLR_FmtArgs(
-                    PNSLR_FmtString(objName),
-                    PNSLR_FmtString(blobMsg)
-                ),
-                loc);
-
-    blob->Release();
-}
-
-#define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
-    MZNT_Internal_LogDx12ResultOnFailure((call), Panshilar::StringLiteral(#call), PNSLR_GET_LOC())
-
-#define MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(blob) \
-    MZNT_Internal_LogErrorBlobAndRelease((blob), Panshilar::StringLiteral(#blob), PNSLR_GET_LOC())
 
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12ColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12DepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
@@ -218,7 +112,7 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
             if (SUCCEEDED(output->device->QueryInterface(IID_PPV_ARGS(&iq1))))
             {
                 DWORD cookie = 0;
-                iq1->RegisterMessageCallback(MZNT_Internal_Dx12DebugCallback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nil, &cookie);
+                iq1->RegisterMessageCallback(MZNT_Internal_GetDx12DebugCallback(), D3D12_MESSAGE_CALLBACK_FLAG_NONE, nil, &cookie);
                 output->dbgCallbackCookie = cookie;
 
                 iq1->Release();
@@ -978,31 +872,6 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
 
     MZNT_INTERNAL_DX12_CHECKED_CALL(surface->renderer->cmdQueue->Signal(surface->fence, surface->nextFenceValue + 1));
     return true;
-}
-
-MZNT_DirectX12SwapChain* MZNT_CreateSwapChainFromWindow_DirectX12(MZNT_DirectX12Renderer* renderer, MZNT_WindowHandle windowHandle, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
-{
-    return nil;
-}
-
-b8 MZNT_ReconfigureSwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
-{
-    return false;
-}
-
-b8 MZNT_DestroySwapChain_DirectX12(MZNT_DirectX12SwapChain* swapChain, PNSLR_Allocator tempAllocator)
-{
-    return false;
-}
-
-MZNT_TextureFormat MZNT_GetSwapChainTextureFormat_DirectX12(MZNT_DirectX12SwapChain* swapChain)
-{
-     return MZNT_TextureFormat_Unknown;
-}
-
-u8 MZNT_IterateSwapChainAndGetIndex_DirectX12(MZNT_DirectX12SwapChain* swapChain)
-{
-    return U8_MAX;
 }
 
 #endif

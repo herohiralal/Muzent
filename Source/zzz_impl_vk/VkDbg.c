@@ -32,7 +32,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL MZNT_Internal_VkDebugCallback(
     return VK_FALSE;
 }
 
-inline PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void) { return MZNT_Internal_VkDebugCallback; }
+PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void) { return MZNT_Internal_VkDebugCallback; }
 
 void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
 {
