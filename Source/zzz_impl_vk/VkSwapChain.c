@@ -124,6 +124,7 @@ static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PN
     PNSLR_FreeSlice(&(swapChain->cmdBuffers), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     vkDestroySwapchainKHR(swapChain->renderer->device, swapChain->actual, nil);
+    vkDestroySurfaceKHR(swapChain->renderer->instance, swapChain->surface, nil);
 }
 
 static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
