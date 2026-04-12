@@ -23,13 +23,47 @@
 #undef INLINED_FILE_INCLUSION_NAME
 
 static void __stdcall MZNT_Internal_Dx12DebugCallback(
-    D3D12_MESSAGE_CATEGORY Category,
-    D3D12_MESSAGE_SEVERITY Severity,
-    D3D12_MESSAGE_ID ID,
+    D3D12_MESSAGE_CATEGORY category,
+    D3D12_MESSAGE_SEVERITY severity,
+    D3D12_MESSAGE_ID id,
     LPCSTR pDescription,
     void* pContext)
 {
-    FORCE_DBG_TRAP;
+    utf8str categoryStr = { };
+    switch (category)
+    {
+        case D3D12_MESSAGE_CATEGORY_APPLICATION_DEFINED:   categoryStr = PNSLR_StringLiteral("[ApplicationDefined]");   break;
+        case D3D12_MESSAGE_CATEGORY_MISCELLANEOUS:         categoryStr = PNSLR_StringLiteral("[Miscellaneous]");        break;
+        case D3D12_MESSAGE_CATEGORY_INITIALIZATION:        categoryStr = PNSLR_StringLiteral("[Initialization]");       break;
+        case D3D12_MESSAGE_CATEGORY_CLEANUP:               categoryStr = PNSLR_StringLiteral("[Cleanup]");              break;
+        case D3D12_MESSAGE_CATEGORY_COMPILATION:           categoryStr = PNSLR_StringLiteral("[Compilation]");          break;
+        case D3D12_MESSAGE_CATEGORY_STATE_CREATION:        categoryStr = PNSLR_StringLiteral("[StateCreation]");        break;
+        case D3D12_MESSAGE_CATEGORY_STATE_SETTING:         categoryStr = PNSLR_StringLiteral("[StateSetting]");         break;
+        case D3D12_MESSAGE_CATEGORY_STATE_GETTING:         categoryStr = PNSLR_StringLiteral("[StateGetting]");         break;
+        case D3D12_MESSAGE_CATEGORY_RESOURCE_MANIPULATION: categoryStr = PNSLR_StringLiteral("[ResourceManipulation]"); break;
+        case D3D12_MESSAGE_CATEGORY_EXECUTION:             categoryStr = PNSLR_StringLiteral("[Execution]");            break;
+        case D3D12_MESSAGE_CATEGORY_SHADER:                categoryStr = PNSLR_StringLiteral("[Shader]");               break;
+        default:                                           categoryStr = PNSLR_StringLiteral("[Unknown]");              break;
+    }
+
+    PNSLR_LoggerLevel lvl = 0;
+    switch (severity)
+    {
+        case D3D12_MESSAGE_SEVERITY_CORRUPTION: lvl = PNSLR_LoggerLevel_Critical; break;
+        case D3D12_MESSAGE_SEVERITY_ERROR:      lvl = PNSLR_LoggerLevel_Error;    break;
+        case D3D12_MESSAGE_SEVERITY_WARNING:    lvl = PNSLR_LoggerLevel_Warn;     break;
+        case D3D12_MESSAGE_SEVERITY_INFO:       lvl = PNSLR_LoggerLevel_Info;     break;
+        case D3D12_MESSAGE_SEVERITY_MESSAGE:    lvl = PNSLR_LoggerLevel_Debug;    break;
+        default:                                lvl = PNSLR_LoggerLevel_Error;    break;
+    }
+
+    PNSLR_Logf(lvl, PNSLR_StringLiteral("D3D12 INFO QUEUE: $ $"),
+        PNSLR_FmtArgs(
+            PNSLR_FmtCString((cstring) pDescription),
+            PNSLR_FmtString(categoryStr),
+        ),
+        PNSLR_GET_LOC()
+    );
 }
 
 static inline void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc)
