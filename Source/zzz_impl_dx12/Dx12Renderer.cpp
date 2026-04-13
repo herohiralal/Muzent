@@ -134,111 +134,6 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     allocDesc.pAdapter = output->adapter;
     MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12MA::CreateAllocator(&allocDesc, &(output->d3d12maAllocator)));
 
-    // hello triangle shader
-    {
-        // root signature - vs
-        {
-            D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = { };
-            rootDesc.Version                    = D3D_ROOT_SIGNATURE_VERSION_1_0;
-            rootDesc.Desc_1_0.NumParameters     = 0;
-            rootDesc.Desc_1_0.pParameters       = nil;
-            rootDesc.Desc_1_0.NumStaticSamplers = 0;
-            rootDesc.Desc_1_0.pStaticSamplers   = nil;
-            rootDesc.Desc_1_0.Flags             = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-            ID3DBlob* serializedDesc = nil;
-            ID3DBlob* errorBlob = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, &errorBlob));
-            MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(errorBlob);
-            MZNT_INTERNAL_DX12_CHECKED_CALL(
-                output->device->CreateRootSignature(
-                    0,
-                    serializedDesc->GetBufferPointer(),
-                    serializedDesc->GetBufferSize(),
-                    IID_PPV_ARGS(&(output->helloTriangleVertexShadedProgram.rootSignature))
-                ));
-            serializedDesc->Release();
-        }
-
-        // pso - vs
-        {
-            D3D12_INPUT_LAYOUT_DESC inputLayout = { };
-            inputLayout.pInputElementDescs = nil;
-            inputLayout.NumElements        = 0;
-
-            D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
-            psoDesc.pRootSignature                  = output->helloTriangleVertexShadedProgram.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleFSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleFSSize;
-            psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
-            psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
-            psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                   = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
-            psoDesc.NumRenderTargets                = 1;
-            psoDesc.SampleDesc.Count                = 1;
-            psoDesc.SampleMask                      = UINT_MAX;
-            psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoDesc.DepthStencilState               = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-            psoDesc.DSVFormat                       = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
-
-            MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->helloTriangleVertexShadedProgram.pipelineState))));
-        }
-
-        // root signature - ms
-        {
-            D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = { };
-            rootDesc.Version                    = D3D_ROOT_SIGNATURE_VERSION_1_0;
-            rootDesc.Desc_1_0.NumParameters     = 0;
-            rootDesc.Desc_1_0.pParameters       = nil;
-            rootDesc.Desc_1_0.NumStaticSamplers = 0;
-            rootDesc.Desc_1_0.pStaticSamplers   = nil;
-            rootDesc.Desc_1_0.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-            ID3DBlob* serializedDesc = nil;
-            ID3DBlob* errorBlob = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, &errorBlob));
-            MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(errorBlob);
-            MZNT_INTERNAL_DX12_CHECKED_CALL(
-                output->device->CreateRootSignature(
-                    0,
-                    serializedDesc->GetBufferPointer(),
-                    serializedDesc->GetBufferSize(),
-                    IID_PPV_ARGS(&(output->helloTriangleMeshShadedProgram.rootSignature))
-                ));
-            serializedDesc->Release();
-        }
-
-        // pso - ms
-        {
-            D3DX12_MESH_SHADER_PIPELINE_STATE_DESC psoDesc = { };
-            psoDesc.pRootSignature                  = output->helloTriangleMeshShadedProgram.rootSignature;
-            psoDesc.MS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleMSContents;
-            psoDesc.MS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleMSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12HelloTriangleFSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12HelloTriangleFSSize;
-            psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                   = k_MZNT_Internal_PreferredDx12ColourAttchFormat;
-            psoDesc.NumRenderTargets                = 1;
-            psoDesc.SampleDesc.Count                = 1;
-            psoDesc.SampleMask                      = UINT_MAX;
-            psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoDesc.DepthStencilState               = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-            psoDesc.DSVFormat                       = k_MZNT_Internal_PreferredDx12DepthAttchFormat;
-
-            CD3DX12_PIPELINE_MESH_STATE_STREAM psoStream = psoDesc;
-
-            D3D12_PIPELINE_STATE_STREAM_DESC streamDesc = { };
-            streamDesc.pPipelineStateSubobjectStream = &psoStream;
-            streamDesc.SizeInBytes                   = sizeof(psoStream);
-
-            MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreatePipelineState(&streamDesc, IID_PPV_ARGS(&(output->helloTriangleMeshShadedProgram.pipelineState))));
-        }
-    }
-
     return output;
 }
 
@@ -269,12 +164,6 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     if (!renderer) return false;
 
     MZNT_WaitTillRendererIdle_DirectX12(renderer);
-
-    renderer->helloTriangleMeshShadedProgram.pipelineState->Release();
-    renderer->helloTriangleMeshShadedProgram.rootSignature->Release();
-
-    renderer->helloTriangleVertexShadedProgram.pipelineState->Release();
-    renderer->helloTriangleVertexShadedProgram.rootSignature->Release();
 
     renderer->d3d12maAllocator->Release();
 
@@ -564,84 +453,6 @@ MZNT_DirectX12RendererSurface* MZNT_CreateRendererSurfaceFromWindow_DirectX12(MZ
     // frame idx
     output->curFrame = output->swapchain->GetCurrentBackBufferIndex();
 
-    // fullscreen blit shader
-    {
-        // root signature
-        {
-            D3D12_DESCRIPTOR_RANGE srcRange = { };
-            srcRange.RangeType                         = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-            srcRange.NumDescriptors                    = 1;
-            srcRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-            D3D12_ROOT_PARAMETER srcParam = { };
-            srcParam.ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            srcParam.ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
-            srcParam.DescriptorTable.NumDescriptorRanges = 1;
-            srcParam.DescriptorTable.pDescriptorRanges   = &srcRange;
-
-            D3D12_STATIC_SAMPLER_DESC linearSampler = { };
-            linearSampler.Filter           = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-            linearSampler.AddressU         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-            linearSampler.AddressV         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-            linearSampler.AddressW         = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-            linearSampler.BorderColor      = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
-            linearSampler.MaxAnisotropy    = 1;
-            linearSampler.ComparisonFunc   = D3D12_COMPARISON_FUNC_ALWAYS;
-            linearSampler.MaxLOD           = D3D12_FLOAT32_MAX;
-            linearSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-            D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc = { };
-            rootDesc.Version                    = D3D_ROOT_SIGNATURE_VERSION_1_0;
-            rootDesc.Desc_1_0.NumParameters     = 1;
-            rootDesc.Desc_1_0.pParameters       = &srcParam;
-            rootDesc.Desc_1_0.NumStaticSamplers = 1;
-            rootDesc.Desc_1_0.pStaticSamplers   = &linearSampler;
-            rootDesc.Desc_1_0.Flags             = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-            ID3DBlob* serializedDesc = nil;
-            ID3DBlob* errorBlob = nil;
-            MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12SerializeVersionedRootSignature(&rootDesc, &serializedDesc, &errorBlob));
-            MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(errorBlob);
-            MZNT_INTERNAL_DX12_CHECKED_CALL(
-                renderer->device->CreateRootSignature(
-                    0,
-                    serializedDesc->GetBufferPointer(),
-                    serializedDesc->GetBufferSize(),
-                    IID_PPV_ARGS(&(output->finalBlitShader.rootSignature))
-                ));
-            serializedDesc->Release();
-        }
-
-        // pso
-        {
-            D3D12_INPUT_LAYOUT_DESC inputLayout = { };
-            inputLayout.pInputElementDescs = nil;
-            inputLayout.NumElements        = 0;
-
-            D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = { };
-            psoDesc.pRootSignature                  = output->finalBlitShader.rootSignature;
-            psoDesc.VS.pShaderBytecode              = k_MZNT_Internal_Dx12FullScreenBlitVSContents;
-            psoDesc.VS.BytecodeLength               = k_MZNT_Internal_Dx12FullScreenBlitVSSize;
-            psoDesc.PS.pShaderBytecode              = k_MZNT_Internal_Dx12FullScreenBlitFSContents;
-            psoDesc.PS.BytecodeLength               = k_MZNT_Internal_Dx12FullScreenBlitFSSize;
-            psoDesc.InputLayout.pInputElementDescs  = inputLayout.pInputElementDescs;
-            psoDesc.InputLayout.NumElements         = inputLayout.NumElements;
-            psoDesc.PrimitiveTopologyType           = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.RTVFormats[0]                   = output->swapchainFormat;
-            psoDesc.NumRenderTargets                = 1;
-            psoDesc.SampleDesc.Count                = 1;
-            psoDesc.SampleMask                      = UINT_MAX;
-            psoDesc.RasterizerState                 = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-            psoDesc.BlendState                      = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-            psoDesc.DepthStencilState               = D3D12_DEPTH_STENCIL_DESC();
-            psoDesc.DepthStencilState.DepthEnable   = false;
-            psoDesc.DepthStencilState.StencilEnable = false;
-            psoDesc.DSVFormat                       = DXGI_FORMAT_UNKNOWN;
-
-            MZNT_INTERNAL_DX12_CHECKED_CALL(renderer->device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&(output->finalBlitShader.pipelineState))));
-        }
-    }
-
     return output;
 }
 
@@ -650,9 +461,6 @@ b8 MZNT_DestroyRendererSurface_DirectX12(MZNT_DirectX12RendererSurface* surface,
     if (!surface) return false;
 
     MZNT_WaitTillRendererIdle_DirectX12(surface->renderer);
-
-    surface->finalBlitShader.pipelineState->Release();
-    surface->finalBlitShader.rootSignature->Release();
 
     // destroy command allocators & command lists
     for (u32 i = 0; i < MZNT_NUM_FRAMES_IN_FLIGHT; i++)
@@ -777,22 +585,6 @@ MZNT_DirectX12RendererCommandBuffer* MZNT_BeginFrame_DirectX12(MZNT_DirectX12Ren
         cmdBuffer.cmdList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
 
-    // draw triangle - vs
-    {
-        cmdBuffer.cmdList->SetPipelineState(surface->renderer->helloTriangleVertexShadedProgram.pipelineState);
-        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->helloTriangleVertexShadedProgram.rootSignature);
-        cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
-        cmdBuffer.cmdList->IASetIndexBuffer(nil);
-        cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
-    }
-    // draw triangle - ms
-    {
-        cmdBuffer.cmdList->SetPipelineState(surface->renderer->helloTriangleMeshShadedProgram.pipelineState);
-        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->renderer->helloTriangleMeshShadedProgram.rootSignature);
-        cmdBuffer.cmdList->DispatchMesh(1, 1, 1);
-    }
-
     return &cmdBuffer;
 }
 
@@ -826,22 +618,6 @@ b8 MZNT_EndFrame_DirectX12(MZNT_DirectX12RendererSurface* surface, PNSLR_Allocat
         rtv.ptr += surface->curFrame * surface->swapchainRtvDescriptorSize;
 
         cmdBuffer.cmdList->OMSetRenderTargets(1, &rtv, FALSE, nil);
-    }
-
-    // cant do a copy texture, because the outputs are in different formats, so do a fullscreen blit instead
-    {
-        cmdBuffer.cmdList->SetPipelineState(surface->finalBlitShader.pipelineState);
-        cmdBuffer.cmdList->SetGraphicsRootSignature(surface->finalBlitShader.rootSignature);
-
-        cmdBuffer.cmdList->SetDescriptorHeaps(1, &surface->svSrvHeap);
-
-        D3D12_GPU_DESCRIPTOR_HANDLE srvHandle = surface->svSrvHeap->GetGPUDescriptorHandleForHeapStart();
-        srvHandle.ptr += surface->curFrame * surface->svSrvDescriptorSize;
-        cmdBuffer.cmdList->SetGraphicsRootDescriptorTable(0, srvHandle);
-        cmdBuffer.cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        cmdBuffer.cmdList->IASetVertexBuffers(0, 0, nil);
-        cmdBuffer.cmdList->IASetIndexBuffer(nil);
-        cmdBuffer.cmdList->DrawInstanced(3, 1, 0, 0);
     }
 
     // screenbuffer: srv -> rt, swapchain: rt -> present

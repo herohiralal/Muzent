@@ -45,18 +45,18 @@ PNSLR_DECLARE_ARRAY_SLICE(MZNT_VulkanRendererCommandBuffer);
 // swap chain
 typedef struct alignas(64) MZNT_VulkanSwapChain
 {
-    MZNT_SwapChain       parent;
-    MZNT_VulkanRenderer* renderer;
-    VkSwapchainKHR       actual;
-
-    // cfg
-    b8 vSync;
-    u8 framesInFlight;
+    MZNT_SwapChain             parent;
+    const MZNT_VulkanRenderer* renderer;
+    VkSwapchainKHR             actual;
 
     // surface info
     VkSurfaceKHR         surface;
     VkSurfaceFormatKHR   surfaceFmt;
     VkExtent2D           surfaceSize;
+
+    // cfg
+    b8 vSync;
+    u8 framesInFlight;
 
     // syncing
     b8                            noCmdBufThisFrame;
@@ -77,7 +77,7 @@ typedef struct alignas(64) MZNT_VulkanSwapChain
 struct MZNT_VulkanRendererCommandBuffer
 {
     MZNT_RendererCommandBuffer parent;
-    MZNT_VulkanRenderer*       renderer;
+    const MZNT_VulkanRenderer* renderer;
     VkCommandPool              cmdPool;
     VkCommandBuffer            cmdBuffer;
 };

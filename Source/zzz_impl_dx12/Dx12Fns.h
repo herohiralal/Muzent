@@ -16,6 +16,9 @@ void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR
 #define MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(blob) \
     MZNT_Internal_LogErrorBlobAndRelease((blob), Panshilar::StringLiteral(#blob), PNSLR_GET_LOC())
 
+inline DXGI_FORMAT MZNT_Internal_BreakDx12TextureFormat(MZNT_TextureFormat fmt);
+inline MZNT_TextureFormat MZNT_Internal_MakeDx12TextureFormat(DXGI_FORMAT fmt);
+
 MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration config, PNSLR_Allocator tempAllocator);
 b8 MZNT_WaitTillRendererIdle_DirectX12(MZNT_DirectX12Renderer* renderer);
 b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Allocator tempAllocator);

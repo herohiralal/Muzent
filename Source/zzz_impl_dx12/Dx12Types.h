@@ -5,6 +5,9 @@
 #if defined(MZNT_IMPLEMENTATION) && MZNT_DX12
 EXTERN_C_BEGIN
 
+typedef ID3D12Resource* ID3D12ResourcePtr;
+PNSLR_DECLARE_ARRAY_SLICE(ID3D12ResourcePtr);
+
 // d3d12ma struct ptr fwds
 #ifdef __cplusplus
 typedef class D3D12MA::Allocator* DxAllocator;
@@ -13,13 +16,6 @@ typedef class D3D12MA::Allocation* DxAllocation;
 typedef struct DxAllocator* DxAllocator;
 typedef struct DxAllocation* DxAllocation;
 #endif
-
-// shader
-typedef struct MZNT_DirectX12Shader
-{
-    ID3D12RootSignature* rootSignature;
-    ID3D12PipelineState* pipelineState;
-} MZNT_DirectX12Shader;
 
 // renderer
 typedef struct MZNT_DirectX12Renderer
@@ -34,10 +30,10 @@ typedef struct MZNT_DirectX12Renderer
     u32          dbgCallbackCookie;
 
     DxAllocator d3d12maAllocator;
-
-    MZNT_DirectX12Shader helloTriangleVertexShadedProgram;
-    MZNT_DirectX12Shader helloTriangleMeshShadedProgram;
 } MZNT_DirectX12Renderer;
+
+typedef struct MZNT_DirectX12RendererCommandBuffer MZNT_DirectX12RendererCommandBuffer;
+PNSLR_DECLARE_ARRAY_SLICE(MZNT_DirectX12RendererCommandBuffer);
 
 // cmd buffer
 typedef struct MZNT_DirectX12RendererCommandBuffer
@@ -85,15 +81,37 @@ typedef struct MZNT_DirectX12RendererSurface
     UINT64       frameFenceValues[MZNT_NUM_FRAMES_IN_FLIGHT];
     UINT64       nextFenceValue;
     HANDLE       fenceEvent;
-
-    // shaders
-    MZNT_DirectX12Shader finalBlitShader;
 } MZNT_DirectX12RendererSurface;
 
 // swap chain
 typedef struct MZNT_DirectX12SwapChain
 {
-    MZNT_SwapChain parent;
+    MZNT_SwapChain                parent;
+    const MZNT_DirectX12Renderer* renderer;
+    IDXGISwapChain4*              actual;
+
+    // surface info
+    DXGI_FORMAT swapChainFormat;
+    u32         swapChainWidth, swapChainHeight;
+
+    // cfg
+    b8 vSync;
+    b8 framesInFlight;
+
+    // syncing
+    b8                    noCmdBufThisFrame;
+    u32                   curFrame;
+    PNSLR_ArraySlice(u64) frameFenceValues;
+    u64                   nextFenceValue;
+    HANDLE                fenceEvt;
+
+    // images
+    ID3D12DescriptorHeap*               swapchainRtvHeap;
+    UINT                                swapchainRtvDescriptorSize;
+    PNSLR_ArraySlice(ID3D12ResourcePtr) swapchainRTs;
+
+    // command buffers
+    PNSLR_ArraySlice(MZNT_DirectX12RendererCommandBuffer) cmdBuffers;
 } MZNT_DirectX12SwapChain;
 
 EXTERN_C_END
