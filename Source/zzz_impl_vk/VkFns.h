@@ -9,7 +9,7 @@ EXTERN_C_BEGIN
 
 PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void);
 void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc);
-void MZNT_Internal_SetVkObjDebugName(MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, cstring name);
+void MZNT_Internal_SetVkObjDebugName(const MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator);
 
 #define MZNT_INTERNAL_VK_CHECKED_CALL(call) \
     MZNT_Internal_LogVkResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())

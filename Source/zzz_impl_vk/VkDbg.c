@@ -106,7 +106,7 @@ void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_S
     }
 }
 
-void MZNT_Internal_SetVkObjDebugName(MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, cstring name)
+void MZNT_Internal_SetVkObjDebugName(const MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator)
 {
     if (!renderer->debugMessenger) return;
 
@@ -116,7 +116,7 @@ void MZNT_Internal_SetVkObjDebugName(MZNT_VulkanRenderer* renderer, void* obj, V
         .pNext        = nil,
         .objectHandle = (u64) obj,
         .objectType   = objTy,
-        .pObjectName  = name,
+        .pObjectName  = PNSLR_FormatCString(fmtStr, fmtArgs, tempAllocator),
     });
 }
 
