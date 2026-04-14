@@ -209,6 +209,16 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 
     PNSLR_Delete(renderer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
+    if (PNSLR_DBG)
+    {
+        IDXGIDebug1* pDebug = nullptr;
+        if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+        {
+            pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+            pDebug->Release();
+        }
+    }
+
     return true;
 }
 

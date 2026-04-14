@@ -61,6 +61,9 @@ PNSLR_SUPPRESS_WARN
     #include "Dependencies/d3d12/d3d12.h"
     #include <dxgi1_6.h>
     #include <d3dcompiler.h>
+    #if PNSLR_DBG
+        #include <dxgidebug.h>
+    #endif
 
     #undef COBJMACROS
     #undef CINTERFACE

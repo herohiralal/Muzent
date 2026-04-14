@@ -6,10 +6,13 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
 {
     if (swapChain->actual) // already has one
     {
-        swapChain->swapChainWidth = cfg.width;
-        swapChain->swapChainHeight = cfg.height;
+        for (i32 i = 0; i < swapChain->framesInFlight; i++)
+        {
+            swapChain->swapchainRTs.data[i]->Release();
+            swapChain->swapchainRTs.data[i] = nil;
+        }
 
-        MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->ResizeBuffers(cfg.framesInFlight, cfg.width, cfg.height, swapChain->swapChainFormat, 0));
+        MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->ResizeBuffers(cfg.framesInFlight, cfg.width, cfg.height, swapChain->swapChainFormat, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING));
     }
     else
     {
@@ -17,8 +20,8 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
         swapChain->swapChainFormat = DXGI_FORMAT_B8G8R8A8_UNORM; // this is the most widely supported swapchain format, even though we render to a different format internally
 
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { };
-        swapChainDesc.Width            = 0; // use window's client area width
-        swapChainDesc.Height           = 0; // use window's client area height
+        swapChainDesc.Width            = cfg.width;
+        swapChainDesc.Height           = cfg.height;
         swapChainDesc.Format           = swapChain->swapChainFormat;
         swapChainDesc.Stereo           = FALSE;
         swapChainDesc.SampleDesc.Count = 1;
@@ -27,7 +30,7 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
         swapChainDesc.Scaling          = DXGI_SCALING_NONE;
         swapChainDesc.SwapEffect       = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.AlphaMode        = DXGI_ALPHA_MODE_UNSPECIFIED;
-        swapChainDesc.Flags            = cfg.vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        swapChainDesc.Flags            = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
         HWND wnd;
         #if PNSLR_WINDOWS
@@ -41,10 +44,39 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
         MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->renderer->dxgiFactory->CreateSwapChainForHwnd(swapChain->renderer->cmdQueue, wnd, &swapChainDesc, nil, nil, (IDXGISwapChain1**) &(swapChain->actual)));
 
         MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->renderer->dxgiFactory->MakeWindowAssociation(wnd, DXGI_MWA_NO_ALT_ENTER)); // disable automatic fullscreen transitions on alt+enter
+    }
 
+    // get width/height
+    {
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = { };
         swapChain->actual->GetDesc1(&swapChainDesc);
         swapChain->swapChainWidth = swapChainDesc.Width;
         swapChain->swapChainHeight = swapChainDesc.Height;
+    }
+
+    // resize render targets
+    PNSLR_ResizeSlice(
+        ID3D12ResourcePtr,
+        &(swapChain->swapchainRTs),
+        cfg.framesInFlight,
+        true,
+        swapChain->renderer->parent.allocator,
+        PNSLR_GET_LOC(),
+        nil
+    );
+
+    // initialise new render targets
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = swapChain->swapchainRtvHeap->GetCPUDescriptorHandleForHeapStart();
+        for (i32 i = 0; i < cfg.framesInFlight; i++)
+        {
+            ID3D12Resource* backBuffer;
+            MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->GetBuffer((u32) i, IID_PPV_ARGS(&backBuffer)));
+            swapChain->renderer->device->CreateRenderTargetView(backBuffer, nil, rtvHandle);
+            rtvHandle.ptr += swapChain->swapchainRtvDescriptorSize;
+
+            swapChain->swapchainRTs.data[i] = backBuffer;
+        }
     }
 
     swapChain->vSync = cfg.vSync;
@@ -72,37 +104,6 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
         // fence itself
         if (swapChain->fence) swapChain->fence->Release();
         MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->renderer->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&(swapChain->fence))));
-
-        // destroy unneeded render targets
-        for (i32 i = cfg.framesInFlight; i < swapChain->framesInFlight; i++)
-        {
-            swapChain->swapchainRTs.data[i]->Release();
-        }
-
-        // resize render targets
-        PNSLR_ResizeSlice(
-            ID3D12ResourcePtr,
-            &(swapChain->swapchainRTs),
-            cfg.framesInFlight,
-            false,
-            swapChain->renderer->parent.allocator,
-            PNSLR_GET_LOC(),
-            nil
-        );
-
-        // initialise new render targets
-        {
-            D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = swapChain->swapchainRtvHeap->GetCPUDescriptorHandleForHeapStart();
-            for (i32 i = swapChain->framesInFlight; i < cfg.framesInFlight; i++)
-            {
-                ID3D12Resource* backBuffer;
-                MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->GetBuffer((u32) i, IID_PPV_ARGS(&backBuffer)));
-                swapChain->renderer->device->CreateRenderTargetView(backBuffer, nil, rtvHandle);
-                rtvHandle.ptr += swapChain->swapchainRtvDescriptorSize;
-
-                swapChain->swapchainRTs.data[i] = backBuffer;
-            }
-        }
 
         // destroy unneeded command buffers
         for (i32 i = cfg.framesInFlight; i < swapChain->framesInFlight; i++)
@@ -171,6 +172,8 @@ static void MZNT_Internal_DestroyDx12SwapChain(MZNT_DirectX12SwapChain* swapChai
     PNSLR_FreeSlice(&(swapChain->cmdBuffers), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     PNSLR_FreeSlice(&(swapChain->frameFenceValues), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+
+    swapChain->fence->Release();
 
     swapChain->actual->Release();
 }
@@ -294,7 +297,7 @@ b8 MZNT_PresentSwapChain_DirectX12(const MZNT_DirectX12SwapChain* swapChain, PNS
         D3D12_TEXTURE_BARRIER textureBarrier = { };
         textureBarrier.SyncBefore   = D3D12_BARRIER_SYNC_NONE;
         textureBarrier.SyncAfter    = D3D12_BARRIER_SYNC_RENDER_TARGET;
-        textureBarrier.AccessBefore = D3D12_BARRIER_ACCESS_COMMON;
+        textureBarrier.AccessBefore = D3D12_BARRIER_ACCESS_NO_ACCESS;
         textureBarrier.AccessAfter  = D3D12_BARRIER_ACCESS_RENDER_TARGET;
         textureBarrier.LayoutBefore = D3D12_BARRIER_LAYOUT_COMMON;
         textureBarrier.LayoutAfter  = D3D12_BARRIER_LAYOUT_RENDER_TARGET;
@@ -326,7 +329,7 @@ b8 MZNT_PresentSwapChain_DirectX12(const MZNT_DirectX12SwapChain* swapChain, PNS
         textureBarrier.SyncBefore   = D3D12_BARRIER_SYNC_RENDER_TARGET;
         textureBarrier.SyncAfter    = D3D12_BARRIER_SYNC_NONE;
         textureBarrier.AccessBefore = D3D12_BARRIER_ACCESS_RENDER_TARGET;
-        textureBarrier.AccessAfter  = D3D12_BARRIER_ACCESS_COMMON;
+        textureBarrier.AccessAfter  = D3D12_BARRIER_ACCESS_NO_ACCESS;
         textureBarrier.LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET;
         textureBarrier.LayoutAfter  = D3D12_BARRIER_LAYOUT_PRESENT;
         textureBarrier.pResource    = swapChain->swapchainRTs.data[swapChain->curFrame];
@@ -357,6 +360,7 @@ b8 MZNT_PresentSwapChain_DirectX12(const MZNT_DirectX12SwapChain* swapChain, PNS
         MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->Present(0, DXGI_PRESENT_ALLOW_TEARING));
     }
 
+    MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->renderer->cmdQueue->Signal(swapChain->fence, swapChain->nextFenceValue + 1));
     return true;
 }
 
