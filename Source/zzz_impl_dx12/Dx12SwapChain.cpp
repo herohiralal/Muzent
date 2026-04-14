@@ -64,7 +64,7 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
 
         // expected fence values
         swapChain->nextFenceValue = U64_MAX;
-        for (i32 i = 0; i < swapChain->frameFenceValues.count; i++)
+        for (i32 i = 0; i < cfg.framesInFlight; i++)
         {
             swapChain->frameFenceValues.data[i] = 0;
         }
@@ -96,7 +96,7 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
             for (i32 i = swapChain->framesInFlight; i < cfg.framesInFlight; i++)
             {
                 ID3D12Resource* backBuffer;
-                MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+                MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->GetBuffer((u32) i, IID_PPV_ARGS(&backBuffer)));
                 swapChain->renderer->device->CreateRenderTargetView(backBuffer, nil, rtvHandle);
                 rtvHandle.ptr += swapChain->swapchainRtvDescriptorSize;
 
@@ -183,8 +183,6 @@ MZNT_DirectX12SwapChain* MZNT_CreateSwapChainFromWindow_DirectX12(MZNT_DirectX12
     output->parent.type    = MZNT_RendererType_DirectX12;
     output->renderer       = renderer;
     output->windowHandle   = windowHandle;
-    output->vSync          = cfg.vSync;
-    output->framesInFlight = cfg.framesInFlight;
 
     // swapchain rtv heap
     {
@@ -358,6 +356,8 @@ b8 MZNT_PresentSwapChain_DirectX12(const MZNT_DirectX12SwapChain* swapChain, PNS
     {
         MZNT_INTERNAL_DX12_CHECKED_CALL(swapChain->actual->Present(0, DXGI_PRESENT_ALLOW_TEARING));
     }
+
+    return true;
 }
 
 #endif

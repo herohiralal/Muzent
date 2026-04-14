@@ -2,7 +2,7 @@
 #include "Dx12Fns.h"
 #if MZNT_DX12
 
-inline DXGI_FORMAT MZNT_Internal_BreakDx12TextureFormat(MZNT_TextureFormat fmt)
+DXGI_FORMAT MZNT_Internal_BreakDx12TextureFormat(MZNT_TextureFormat fmt)
 {
     switch (fmt)
     {
@@ -15,7 +15,7 @@ inline DXGI_FORMAT MZNT_Internal_BreakDx12TextureFormat(MZNT_TextureFormat fmt)
     return DXGI_FORMAT_UNKNOWN;
 }
 
-inline MZNT_TextureFormat MZNT_Internal_MakeDx12TextureFormat(DXGI_FORMAT fmt)
+MZNT_TextureFormat MZNT_Internal_MakeDx12TextureFormat(DXGI_FORMAT fmt)
 {
     PNSLR_SUPPRESS_WARN
     switch (fmt)
