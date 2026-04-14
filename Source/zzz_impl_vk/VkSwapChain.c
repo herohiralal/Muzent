@@ -65,6 +65,10 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
         vkDestroySwapchainKHR(swapChain->renderer->device, swapchainCI.oldSwapchain, nil);
     }
 
+    MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->actual, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->actual),
+        PNSLR_StringLiteral("$.swpch_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName)),
+        tempAllocator);
+
     swapChain->vSync = cfg.vSync;
 
     if (swapChain->framesInFlight != cfg.framesInFlight)
@@ -116,6 +120,19 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
         // update count
         swapChain->framesInFlight = cfg.framesInFlight;
     }
+
+    for (i32 i = 0; i < cfg.framesInFlight; i++)
+    {
+        MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[i]);
+
+        MZNT_Internal_SetVkObjDebugName(swapChain->renderer, cmdBuf->cmdPool, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(cmdBuf->cmdPool),
+            PNSLR_StringLiteral("$.swpch_$.cmdPool_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+
+        MZNT_Internal_SetVkObjDebugName(swapChain->renderer, cmdBuf->cmdBuffer, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(cmdBuf->cmdBuffer),
+            PNSLR_StringLiteral("$.swpch_$.cmdBuf_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+    }
 }
 
 static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
@@ -133,7 +150,7 @@ static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PN
     vkDestroySurfaceKHR(swapChain->renderer->instance, swapChain->surface, nil);
 }
 
-static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator tempAllocator)
+static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
 {
     // get swapchain images
     {
@@ -142,6 +159,13 @@ static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* 
         swapChain->imgs = PNSLR_MakeSlice(VkImage, imgCount, false, swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
         MZNT_INTERNAL_VK_CHECKED_CALL(vkGetSwapchainImagesKHR(swapChain->renderer->device, swapChain->actual, &imgCount, swapChain->imgs.data));
         swapChain->imgs.count = (i64) imgCount;
+
+        for (i32 i = 0; i < (i32) swapChain->imgs.count; i++)
+        {
+            MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->imgs.data[i], MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->imgs.data[i]),
+                PNSLR_StringLiteral("$.swpch_$.img_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+                tempAllocator);
+        }
     }
 
     {
@@ -168,6 +192,10 @@ static void MZNT_Internal_CreateVkSwapChainImagesAndViews(MZNT_VulkanSwapChain* 
                     .layerCount = VK_REMAINING_ARRAY_LAYERS,
                 },
             }, nil, &(swapChain->imgViews.data[i])));
+
+            MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->imgViews.data[i], MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->imgViews.data[i]),
+                PNSLR_StringLiteral("$.swpch_$.imgview_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI64(i, 0)),
+                tempAllocator);
         }
     }
 }
@@ -181,6 +209,29 @@ static void MZNT_Internal_DestroyVkSwapChainImagesAndViews(MZNT_VulkanSwapChain*
 
     PNSLR_FreeSlice(&(swapChain->imgViews), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
     PNSLR_FreeSlice(&(swapChain->imgs), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
+}
+
+static void MZNT_Internal_UpdateVkSwapChainObjsDebugNames(MZNT_VulkanSwapChain* swapChain, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
+{
+    MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->surface, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->surface),
+        PNSLR_StringLiteral("$.swpch_$.surface"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName)),
+        tempAllocator);
+
+    i32 imgCount = (i32) swapChain->imgs.count;
+    for (i32 i = 0; i < imgCount; i++)
+    {
+        MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->presentCompleteSemaphores.data[i], MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->presentCompleteSemaphores.data[i]),
+            PNSLR_StringLiteral("$.swpch_$.prescompsem_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+
+        MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->renderFinishedSemaphores.data[i], MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->renderFinishedSemaphores.data[i]),
+            PNSLR_StringLiteral("$.swpch_$.renderfinsem_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+
+        MZNT_Internal_SetVkObjDebugName(swapChain->renderer, swapChain->inFlightFences.data[i], MZNT_INTERNAL_GET_VK_OBJECT_TYPE(swapChain->inFlightFences.data[i]),
+            PNSLR_StringLiteral("$.swpch_$.inflightfence_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+    }
 }
 
 MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer* renderer, MZNT_WindowHandle windowHandle, MZNT_SwapChainConfiguration cfg, PNSLR_Allocator tempAllocator)
@@ -257,7 +308,7 @@ MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer*
     }
 
     MZNT_Internal_CreateVkSwapChain(output, cfg, tempAllocator);
-    MZNT_Internal_CreateVkSwapChainImagesAndViews(output, tempAllocator);
+    MZNT_Internal_CreateVkSwapChainImagesAndViews(output, cfg, tempAllocator);
 
     output->semIdx = U32_MAX;
     output->curFrame = U32_MAX;
@@ -277,6 +328,8 @@ MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer*
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateFence(renderer->device, &fenceCI, nil, &(output->inFlightFences.data[i])));
     }
 
+    MZNT_Internal_UpdateVkSwapChainObjsDebugNames(output, cfg, tempAllocator);
+
     return output;
 }
 
@@ -290,7 +343,9 @@ b8 MZNT_ReconfigureSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, MZNT_SwapCh
     MZNT_Internal_DestroyVkSwapChainImagesAndViews(swapChain, tempAllocator);
 
     MZNT_Internal_CreateVkSwapChain(swapChain, cfg, tempAllocator);
-    MZNT_Internal_CreateVkSwapChainImagesAndViews(swapChain, tempAllocator);
+    MZNT_Internal_CreateVkSwapChainImagesAndViews(swapChain, cfg, tempAllocator);
+
+    MZNT_Internal_UpdateVkSwapChainObjsDebugNames(swapChain, cfg, tempAllocator);
 
     return true;
 }

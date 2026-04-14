@@ -311,6 +311,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateDebugUtilsMessengerEXT(output->instance, &debugCreateInfo, nil, &output->debugMessenger));
     }
 
+    output->appName = PNSLR_CloneString(config.appName, output->parent.allocator);
+
     u32 deviceCount = 0;
     vkEnumeratePhysicalDevices(output->instance, &deviceCount, nil);
     PNSLR_ArraySlice(VkPhysicalDevice) devices = PNSLR_MakeSlice(VkPhysicalDevice, deviceCount, false, tempAllocator, PNSLR_GET_LOC(), nil);
@@ -407,7 +409,7 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             && !!meshFeatures.meshShader
             && !!meshFeatures.taskShader
             && !!descriptorBufferFeatures.descriptorBuffer
-            && !!true)
+            && selectedDevice == VK_NULL_HANDLE)
         {
             selectedDevice = devices.data[i];
         }
@@ -527,6 +529,13 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
 
     volkLoadDevice(output->device);
 
+    MZNT_Internal_SetVkObjDebugName(output, output->instance, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(output->instance),
+        PNSLR_StringLiteral("$"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)), tempAllocator);
+
+    MZNT_Internal_SetVkObjDebugName(output, output->device, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(output->device),
+        PNSLR_StringLiteral("$.device"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)),
+        tempAllocator);
+
     vkGetDeviceQueue2(output->device, &(VkDeviceQueueInfo2)
     {
         .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
@@ -534,12 +543,20 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .queueIndex       = 0,
     },  &output->gfxQueue);
 
+    MZNT_Internal_SetVkObjDebugName(output, output->gfxQueue, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(output->gfxQueue),
+        PNSLR_StringLiteral("$.gfxQueue"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)),
+        tempAllocator);
+
     vkGetDeviceQueue2(output->device, &(VkDeviceQueueInfo2)
     {
         .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
         .queueFamilyIndex = output->presQueueFamilyIndex,
         .queueIndex       = 0,
     }, &output->presQueue);
+
+    MZNT_Internal_SetVkObjDebugName(output, output->presQueue, MZNT_INTERNAL_GET_VK_OBJECT_TYPE(output->presQueue),
+        PNSLR_StringLiteral("$.presQueue"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)),
+        tempAllocator);
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vmaCreateAllocator(&(VmaAllocatorCreateInfo)
     {
@@ -579,6 +596,8 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
         vkDestroyDebugUtilsMessengerEXT(renderer->instance, renderer->debugMessenger, nil);
 
     vkDestroyInstance(renderer->instance, nil);
+
+    PNSLR_FreeString(renderer->appName, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     PNSLR_Delete(renderer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 

@@ -35,6 +35,7 @@ typedef struct alignas(64) MZNT_VulkanRenderer
     VkQueue          presQueue;
 
     VkDebugUtilsMessengerEXT debugMessenger;
+    utf8str                  appName;
 
     VmaAllocator     vmaAllocator;
 } MZNT_VulkanRenderer;

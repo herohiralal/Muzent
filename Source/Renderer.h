@@ -112,10 +112,11 @@ typedef struct MZNT_RendererSurface
  */
 typedef struct MZNT_SwapChainConfiguration
 {
-    u16 width;
-    u16 height;
-    b8  vSync;
-    u8  framesInFlight;
+    u16     width;
+    u16     height;
+    b8      vSync;
+    u8      framesInFlight;
+    utf8str objectName;
 } MZNT_SwapChainConfiguration;
 
 /**
