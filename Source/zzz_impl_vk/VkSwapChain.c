@@ -72,8 +72,10 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
         // destroy unneeded command buffers
         for (i32 i = cfg.framesInFlight; i < swapChain->framesInFlight; i++)
         {
-            vkFreeCommandBuffers(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, 1, &(swapChain->cmdBuffers.data[i].cmdBuffer));
-            vkDestroyCommandPool(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, nil);
+            MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[i]);
+
+            vkFreeCommandBuffers(swapChain->renderer->device, cmdBuf->cmdPool, 1, &(cmdBuf->cmdBuffer));
+            vkDestroyCommandPool(swapChain->renderer->device, cmdBuf->cmdPool, nil);
         }
 
         // resize
@@ -90,23 +92,25 @@ static void MZNT_Internal_CreateVkSwapChain(MZNT_VulkanSwapChain* swapChain, MZN
         // initialise new command buffers
         for (i32 i = swapChain->framesInFlight; i < cfg.framesInFlight; i++)
         {
-            swapChain->cmdBuffers.data[i].parent.type = MZNT_RendererType_Vulkan;
-            swapChain->cmdBuffers.data[i].renderer    = swapChain->renderer;
+            MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[i]);
+
+            cmdBuf->parent.type = MZNT_RendererType_Vulkan;
+            cmdBuf->renderer    = swapChain->renderer;
 
             MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateCommandPool(swapChain->renderer->device, &(VkCommandPoolCreateInfo)
             {
                 .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
                 .flags = 0,
                 .queueFamilyIndex = swapChain->renderer->gfxQueueFamilyIndex,
-            }, nil, &(swapChain->cmdBuffers.data[i].cmdPool)));
+            }, nil, &(cmdBuf->cmdPool)));
 
             MZNT_INTERNAL_VK_CHECKED_CALL(vkAllocateCommandBuffers(swapChain->renderer->device, &(VkCommandBufferAllocateInfo)
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = swapChain->cmdBuffers.data[i].cmdPool,
+                .commandPool        = cmdBuf->cmdPool,
                 .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1,
-            }, &(swapChain->cmdBuffers.data[i].cmdBuffer)));
+            }, &(cmdBuf->cmdBuffer)));
         }
 
         // update count
@@ -118,8 +122,10 @@ static void MZNT_Internal_DestroyVkSwapChain(MZNT_VulkanSwapChain* swapChain, PN
 {
     for (i32 i = 0; i < swapChain->framesInFlight; i++)
     {
-        vkFreeCommandBuffers(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, 1, &(swapChain->cmdBuffers.data[i].cmdBuffer));
-        vkDestroyCommandPool(swapChain->renderer->device, swapChain->cmdBuffers.data[i].cmdPool, nil);
+        MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[i]);
+
+        vkFreeCommandBuffers(swapChain->renderer->device, cmdBuf->cmdPool, 1, &(cmdBuf->cmdBuffer));
+        vkDestroyCommandPool(swapChain->renderer->device, cmdBuf->cmdPool, nil);
     }
     PNSLR_FreeSlice(&(swapChain->cmdBuffers), swapChain->renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
@@ -412,7 +418,7 @@ b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_All
         {
             {
                 .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-                .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 .srcAccessMask       = VK_ACCESS_2_NONE,
                 .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 .dstAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -467,7 +473,7 @@ b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_All
                 .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
                 .srcStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 .srcAccessMask       = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 .dstAccessMask       = VK_ACCESS_2_NONE,
                 .oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
