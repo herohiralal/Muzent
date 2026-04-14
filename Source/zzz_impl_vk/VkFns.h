@@ -3,11 +3,13 @@
 #include "../__Prelude.h"
 #include "../Renderer.h"
 #include "VkTypes.h"
+#include "VkDbgReflect.h"
 EXTERN_C_BEGIN
 #if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
 
 PFN_vkDebugUtilsMessengerCallbackEXT MZNT_Internal_GetVkDebugCallback(void);
 void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_SourceCodeLocation loc);
+void MZNT_Internal_SetVkObjDebugName(MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, cstring name);
 
 #define MZNT_INTERNAL_VK_CHECKED_CALL(call) \
     MZNT_Internal_LogVkResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())

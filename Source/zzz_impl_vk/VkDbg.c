@@ -106,4 +106,18 @@ void MZNT_Internal_LogVkResultOnFailure(VkResult result, utf8str fnCall, PNSLR_S
     }
 }
 
+void MZNT_Internal_SetVkObjDebugName(MZNT_VulkanRenderer* renderer, void* obj, VkObjectType objTy, cstring name)
+{
+    if (!renderer->debugMessenger) return;
+
+    vkSetDebugUtilsObjectNameEXT(renderer->device, &(VkDebugUtilsObjectNameInfoEXT)
+    {
+        .sType        = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext        = nil,
+        .objectHandle = (u64) obj,
+        .objectType   = objTy,
+        .pObjectName  = name,
+    });
+}
+
 #endif
