@@ -9,12 +9,13 @@ EXTERN_C_BEGIN
 D3D12MessageFunc MZNT_Internal_GetDx12DebugCallback(void);
 void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc);
 void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR_SourceCodeLocation loc);
+void MZNT_Internal_SetDx12ObjDebugName(ID3D12Object* obj, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator);
 
 #define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
-    MZNT_Internal_LogDx12ResultOnFailure((call), Panshilar::StringLiteral(#call), PNSLR_GET_LOC())
+    MZNT_Internal_LogDx12ResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())
 
 #define MZNT_INTERNAL_DX12_LOG_BLOB_AND_RELEASE(blob) \
-    MZNT_Internal_LogErrorBlobAndRelease((blob), Panshilar::StringLiteral(#blob), PNSLR_GET_LOC())
+    MZNT_Internal_LogErrorBlobAndRelease((blob), PNSLR_StringLiteral(#blob), PNSLR_GET_LOC())
 
 DXGI_FORMAT MZNT_Internal_BreakDx12TextureFormat(MZNT_TextureFormat fmt);
 MZNT_TextureFormat MZNT_Internal_MakeDx12TextureFormat(DXGI_FORMAT fmt);

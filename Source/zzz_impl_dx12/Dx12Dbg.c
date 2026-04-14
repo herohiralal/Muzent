@@ -104,4 +104,10 @@ void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR
     ID3D10Blob_Release(blob);
 }
 
+void MZNT_Internal_SetDx12ObjDebugName(ID3D12Object* obj, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator)
+{
+    PNSLR_ArraySlice(u16) name = PNSLR_FormatUTF16StringWindowsOnly(fmtStr, fmtArgs, tempAllocator);
+    MZNT_INTERNAL_DX12_CHECKED_CALL(ID3D12Object_SetName(obj, (WCHAR*) name.data));
+}
+
 #endif
