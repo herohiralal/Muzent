@@ -91,15 +91,6 @@ b8 MZNT_DestroyRenderer(MZNT_Renderer* renderer, PNSLR_Allocator tempAllocator);
  */
 b8 MZNT_WaitTillRendererIdle(MZNT_Renderer* renderer);
 
-//+skipreflect
-
-/**
- * The number of frames that can be processed concurrently.
- */
-#define MZNT_NUM_FRAMES_IN_FLIGHT 2
-
-//-skipreflect
-
 /**
  * A command buffer for recording rendering commands.
  */

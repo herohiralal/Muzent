@@ -59,7 +59,7 @@ typedef struct alignas(64) MZNT_VulkanSwapChain
     u8 framesInFlight;
 
     // syncing
-    b8                            noCmdBufThisFrame;
+    b8                            allowCmdBuff;
     u32                           curFrame, semIdx, curImgIdx;
     PNSLR_ArraySlice(VkSemaphore) presentCompleteSemaphores;
     PNSLR_ArraySlice(VkSemaphore) renderFinishedSemaphores;

@@ -332,7 +332,7 @@ b8 MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator
     if (!swapChain) return false;
     if (!swapChain->renderer) FORCE_DBG_TRAP;
 
-    swapChain->noCmdBufThisFrame = true;
+    swapChain->allowCmdBuff = false;
 
     // DOING THESE SHENNANIGANS TO FIX MINIMISE ISSUES
     {
@@ -370,7 +370,7 @@ b8 MZNT_IterateSwapChain_Vulkan(MZNT_VulkanSwapChain* swapChain, PNSLR_Allocator
         1, &(swapChain->inFlightFences.data[swapChain->curFrame]) // reset fences
     ));
 
-    swapChain->noCmdBufThisFrame = false;
+    swapChain->allowCmdBuff = true;
     return true;
 }
 
@@ -380,10 +380,7 @@ MZNT_VulkanRendererCommandBuffer* MZNT_GetSwapChainCommandBuffer_Vulkan(const MZ
     outImgIdx = outImgIdx ? outImgIdx : &outImgIdxThrowaway;
     *outImgIdx = U8_MAX;
 
-    if (swapChain->noCmdBufThisFrame)
-    {
-        return nil;
-    }
+    if (!swapChain->allowCmdBuff) return nil;
 
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[swapChain->curFrame]);
     MZNT_INTERNAL_VK_CHECKED_CALL(vkResetCommandPool(swapChain->renderer->device, cmdBuf->cmdPool, 0));
@@ -396,6 +393,8 @@ b8 MZNT_PresentSwapChain_Vulkan(const MZNT_VulkanSwapChain* swapChain, PNSLR_All
 {
     if (!swapChain) return false;
     if (!swapChain->renderer) FORCE_DBG_TRAP;
+
+    if (!swapChain->allowCmdBuff) return false;
 
     MZNT_VulkanRendererCommandBuffer* cmdBuf = &(swapChain->cmdBuffers.data[swapChain->curFrame]);
 
