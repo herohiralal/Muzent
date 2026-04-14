@@ -9,7 +9,7 @@ EXTERN_C_BEGIN
 D3D12MessageFunc MZNT_Internal_GetDx12DebugCallback(void);
 void MZNT_Internal_LogDx12ResultOnFailure(HRESULT result, utf8str fnCall, PNSLR_SourceCodeLocation loc);
 void MZNT_Internal_LogErrorBlobAndRelease(ID3DBlob* blob, utf8str objName, PNSLR_SourceCodeLocation loc);
-void MZNT_Internal_SetDx12ObjDebugName(ID3D12Object* obj, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator);
+void MZNT_Internal_SetDx12ObjDebugName(const MZNT_DirectX12Renderer* renderer, ID3D12Object* obj, utf8str fmtStr, PNSLR_ArraySlice(PNSLR_PrimitiveFmtOptions) fmtArgs, PNSLR_Allocator tempAllocator);
 
 #define MZNT_INTERNAL_DX12_CHECKED_CALL(call) \
     MZNT_Internal_LogDx12ResultOnFailure((call), PNSLR_StringLiteral(#call), PNSLR_GET_LOC())

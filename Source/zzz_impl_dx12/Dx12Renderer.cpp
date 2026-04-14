@@ -34,6 +34,8 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     output->parent.allocator = config.allocator;
     output->parent.appHandle = config.appHandle;
 
+    output->appName = PNSLR_CloneString(config.appName, output->parent.allocator);
+
     // debug layer
     u32 dxgiFactoryFlags = 0;
     if (PNSLR_DBG)
@@ -85,6 +87,9 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     // device
     MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12CreateDevice(output->adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&(output->device))));
 
+    MZNT_Internal_SetDx12ObjDebugName(output, output->device,
+        PNSLR_StringLiteral("$.device"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)), tempAllocator);
+
     // info queue setup
     {
         ID3D12InfoQueue* infoQueue = nil;
@@ -127,6 +132,9 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     queueDesc.Type     = D3D12_COMMAND_LIST_TYPE_DIRECT;
     queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
     MZNT_INTERNAL_DX12_CHECKED_CALL(output->device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&(output->cmdQueue))));
+
+    MZNT_Internal_SetDx12ObjDebugName(output, output->cmdQueue,
+        PNSLR_StringLiteral("$.maincmdqueue"), PNSLR_FmtArgs(PNSLR_FmtString(output->appName)), tempAllocator);
 
     // allocator
     D3D12MA::ALLOCATOR_DESC allocDesc = { };
@@ -206,6 +214,8 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
 
         renderer->dbgController->Release();
     }
+
+    PNSLR_FreeString(renderer->appName, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 
     PNSLR_Delete(renderer, renderer->parent.allocator, PNSLR_GET_LOC(), nil);
 

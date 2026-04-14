@@ -30,6 +30,8 @@ typedef struct MZNT_DirectX12Renderer
     u32          dbgCallbackCookie;
 
     DxAllocator d3d12maAllocator;
+
+    utf8str appName;
 } MZNT_DirectX12Renderer;
 
 typedef struct MZNT_DirectX12RendererCommandBuffer MZNT_DirectX12RendererCommandBuffer;

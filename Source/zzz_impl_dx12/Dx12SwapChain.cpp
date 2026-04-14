@@ -76,6 +76,10 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
             rtvHandle.ptr += swapChain->swapchainRtvDescriptorSize;
 
             swapChain->swapchainRTs.data[i] = backBuffer;
+
+            MZNT_Internal_SetDx12ObjDebugName(swapChain->renderer, swapChain->swapchainRTs.data[i],
+                PNSLR_StringLiteral("$.swpch_$.rt_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+                tempAllocator);
         }
     }
 
@@ -150,6 +154,21 @@ static void MZNT_Internal_CreateDx12SwapChain(MZNT_DirectX12SwapChain* swapChain
 
         // update count
         swapChain->framesInFlight = cfg.framesInFlight;
+    }
+
+    MZNT_Internal_SetDx12ObjDebugName(swapChain->renderer, swapChain->fence,
+        PNSLR_StringLiteral("$.swpch_$.fence"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName)),
+        tempAllocator);
+
+    for (i32 i = 0; i < cfg.framesInFlight; i++)
+    {
+        MZNT_Internal_SetDx12ObjDebugName(swapChain->renderer, swapChain->cmdBuffers.data[i].cmdAllocator,
+            PNSLR_StringLiteral("$.swpch_$.cmdPool_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
+
+        MZNT_Internal_SetDx12ObjDebugName(swapChain->renderer, swapChain->cmdBuffers.data[i].cmdList,
+            PNSLR_StringLiteral("$.swpch_$.cmdbuf_$"), PNSLR_FmtArgs(PNSLR_FmtString(swapChain->renderer->appName), PNSLR_FmtString(cfg.objectName), PNSLR_FmtI32(i, 0)),
+            tempAllocator);
     }
 
     swapChain->curFrame = swapChain->actual->GetCurrentBackBufferIndex();
@@ -333,7 +352,7 @@ b8 MZNT_PresentSwapChain_DirectX12(const MZNT_DirectX12SwapChain* swapChain, PNS
         textureBarrier.LayoutBefore = D3D12_BARRIER_LAYOUT_RENDER_TARGET;
         textureBarrier.LayoutAfter  = D3D12_BARRIER_LAYOUT_PRESENT;
         textureBarrier.pResource    = swapChain->swapchainRTs.data[swapChain->curFrame];
-        textureBarrier.Subresources = CD3DX12_BARRIER_SUBRESOURCE_RANGE(0xffffffff);
+        textureBarrier.Subresources = CD3DX12_BARRIER_SUBRESOURCE_RANGE(U32_MAX);
 
         D3D12_BARRIER_GROUP barrier = { };
         barrier.Type                = D3D12_BARRIER_TYPE_TEXTURE;
