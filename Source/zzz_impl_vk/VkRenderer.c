@@ -241,8 +241,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             .pLayerName   = "VK_LAYER_KHRONOS_validation",
             .pSettingName = "report_flags",
             .type         = VK_LAYER_SETTING_TYPE_STRING_EXT,
-            .valueCount   = 5,
-            .pValues      = (char*[]) {"info", "warn", "perf", "error", "debug"},
+            .valueCount   = 4,
+            .pValues      = (char*[]) {"info", "warn", "perf", "error"},
         },
         {
             .pLayerName   = "VK_LAYER_KHRONOS_validation",
@@ -254,9 +254,9 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         {
             .pLayerName   = "VK_LAYER_KHRONOS_validation",
             .pSettingName = "duplicate_message_limit",
-            .type         = VK_LAYER_SETTING_TYPE_INT32_EXT,
+            .type         = VK_LAYER_SETTING_TYPE_UINT32_EXT,
             .valueCount   = 1,
-            .pValues      = (i32[]) {5},
+            .pValues      = (u32[]) {5},
         },
     };
 
