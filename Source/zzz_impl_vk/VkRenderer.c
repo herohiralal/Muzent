@@ -199,12 +199,72 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
             enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
             continue;
         }
+
+        if (PNSLR_AreCStringsEqual(ext->extensionName, VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, 0))
+        {
+            enabledExtensions[enabledExtensionsCount++] = &(ext->extensionName[0]);
+            continue;
+        }
     }
+
+    VkLayerSettingEXT settings[] =
+    {
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "validate_core",
+            .type         = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+            .valueCount   = 1,
+            .pValues      = (VkBool32[]) {(VkBool32) PNSLR_DBG},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "validate_sync",
+            .type         = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+            .valueCount   = 1,
+            .pValues      = (VkBool32[]) {(VkBool32) PNSLR_DBG},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "thread_safety",
+            .type         = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+            .valueCount   = 1,
+            .pValues      = (VkBool32[]) {(VkBool32) PNSLR_DBG},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "debug_action",
+            .type         = VK_LAYER_SETTING_TYPE_STRING_EXT,
+            .valueCount   = 1,
+            .pValues      = (char*[]) {"VK_DBG_LAYER_ACTION_LOG_MSG"},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "report_flags",
+            .type         = VK_LAYER_SETTING_TYPE_STRING_EXT,
+            .valueCount   = 5,
+            .pValues      = (char*[]) {"info", "warn", "perf", "error", "debug"},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "enable_message_limit",
+            .type         = VK_LAYER_SETTING_TYPE_BOOL32_EXT,
+            .valueCount   = 1,
+            .pValues      = (VkBool32[]) {VK_TRUE},
+        },
+        {
+            .pLayerName   = "VK_LAYER_KHRONOS_validation",
+            .pSettingName = "duplicate_message_limit",
+            .type         = VK_LAYER_SETTING_TYPE_INT32_EXT,
+            .valueCount   = 1,
+            .pValues      = (i32[]) {5},
+        },
+    };
+
+    i32 settingsCount = sizeof(settings) / sizeof(settings[0]);
 
     MZNT_INTERNAL_VK_CHECKED_CALL(vkCreateInstance(&(VkInstanceCreateInfo)
     {
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext = nil,
         .flags = 0,
         .pApplicationInfo = &(VkApplicationInfo)
         {
@@ -220,6 +280,13 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         .ppEnabledLayerNames = (const char* const*) enabledLayers,
         .enabledExtensionCount = enabledExtensionsCount,
         .ppEnabledExtensionNames = (const char* const*) enabledExtensions,
+        .pNext = &(VkLayerSettingsCreateInfoEXT)
+        {
+            .sType        = VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT,
+            .pNext        = nil,
+            .settingCount = settingsCount,
+            .pSettings    = settings,
+        },
     }, nil, &output->instance));
 
     volkLoadInstanceOnly(output->instance);

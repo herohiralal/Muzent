@@ -248,8 +248,6 @@ MZNT_VulkanSwapChain* MZNT_CreateSwapChainFromWindow_Vulkan(MZNT_VulkanRenderer*
                 break;
             }
         }
-
-        PNSLR_FreeSlice(&surfaceFormats, tempAllocator, PNSLR_GET_LOC(), nil);
     }
 
     MZNT_Internal_CreateVkSwapChain(output, cfg, tempAllocator);
