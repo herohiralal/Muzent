@@ -57,6 +57,7 @@ typedef struct MZNT_RendererConfiguration
     MZNT_AppHandle    appHandle;
     PNSLR_Allocator   allocator;
     utf8str           appName;
+    PNSLR_Path        shaderCompilerLibraryDir;
 } MZNT_RendererConfiguration;
 
 /**

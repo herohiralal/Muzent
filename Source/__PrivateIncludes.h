@@ -69,7 +69,6 @@ PNSLR_SUPPRESS_WARN
     #undef CINTERFACE
 
     #ifdef __cplusplus
-        #include <dxcapi.h>
         #include "Dependencies/D3D12MA/D3D12MemAlloc.h"
         #include "Dependencies/D3D12MA/D3D12MemAlloc.cpp"
 
@@ -85,6 +84,12 @@ PNSLR_SUPPRESS_WARN
         #pragma comment(lib, "d3d12.lib")
         #pragma comment(lib, "dxgi.lib")
         #pragma comment(lib, "d3dcompiler.lib")
+    #endif
+#endif
+
+#if PNSLR_WINDOWS || PNSLR_LINUX
+    #ifdef __cplusplus
+        #include "Dependencies/dxc/dxcapi.h"
     #endif
 #endif
 
