@@ -2,6 +2,7 @@
 #define MZNT_DX12_TYPES_H
 #include "../__Prelude.h"
 #include "../Renderer.h"
+#include "../ShaderCompilerPrivate.h"
 #if defined(MZNT_IMPLEMENTATION) && MZNT_DX12
 EXTERN_C_BEGIN
 
@@ -32,6 +33,8 @@ typedef struct MZNT_DirectX12Renderer
     DxAllocator d3d12maAllocator;
 
     utf8str appName;
+
+    MZNT_Internal_ShaderCompiler shaderCompiler;
 } MZNT_DirectX12Renderer;
 
 typedef struct MZNT_DirectX12RendererCommandBuffer MZNT_DirectX12RendererCommandBuffer;

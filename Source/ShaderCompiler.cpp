@@ -17,10 +17,13 @@ MZNT_Internal_ShaderCompiler MZNT_Internal_CreateShaderCompiler(PNSLR_Path libSe
 
     #if PNSLR_WINDOWS || PNSLR_LINUX
     {
+        if (!libSearchDir.path.count || !libSearchDir.path.data)
+            return MZNT_Internal_ShaderCompiler { };
+
         PNSLR_Path library = PNSLR_GetPathForChildFile(libSearchDir, libName, tempAllocator);
 
         MZNT_Internal_ShaderCompiler output = { };
-        output.lib = PNSLR_GetDynamicLibrary(library);
+        output.lib = PNSLR_LoadDynamicLibrary(library);
         if (!output.lib.handle)
         {
             PNSLR_LogEf(PNSLR_StringLiteral("could not load $"), PNSLR_FmtArgs(PNSLR_FmtString(library.path)), PNSLR_GET_LOC());

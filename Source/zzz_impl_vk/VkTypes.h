@@ -2,6 +2,7 @@
 #define MZNT_VK_TYPES_H
 #include "../__Prelude.h"
 #include "../Renderer.h"
+#include "../ShaderCompilerPrivate.h"
 #if defined(MZNT_IMPLEMENTATION) && MZNT_VULKAN
 EXTERN_C_BEGIN
 
@@ -38,6 +39,8 @@ typedef struct alignas(64) MZNT_VulkanRenderer
     utf8str                  appName;
 
     VmaAllocator     vmaAllocator;
+
+    MZNT_Internal_ShaderCompiler shaderCompiler;
 } MZNT_VulkanRenderer;
 
 typedef struct MZNT_VulkanRendererCommandBuffer MZNT_VulkanRendererCommandBuffer;

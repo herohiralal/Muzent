@@ -571,6 +571,8 @@ MZNT_VulkanRenderer* MZNT_CreateRenderer_Vulkan(MZNT_RendererConfiguration confi
         },
     }, &(output->vmaAllocator)));
 
+    output->shaderCompiler = MZNT_Internal_CreateShaderCompiler(config.shaderCompilerLibraryDir, tempAllocator);
+
     return output;
 }
 
@@ -587,6 +589,8 @@ b8 MZNT_DestroyRenderer_Vulkan(MZNT_VulkanRenderer* renderer, PNSLR_Allocator te
     if (!renderer) return false;
 
     MZNT_WaitTillRendererIdle_Vulkan(renderer);
+
+    MZNT_Internal_DestroyShaderCompiler(renderer->shaderCompiler, tempAllocator);
 
     vmaDestroyAllocator(renderer->vmaAllocator);
 
