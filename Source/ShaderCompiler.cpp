@@ -1,7 +1,16 @@
 #define MZNT_IMPLEMENTATION
-#include "ShaderCompilerPrivate.h"
+#include "ShaderCompiler.h"
 
-MZNT_Internal_ShaderCompiler MZNT_Internal_CreateShaderCompiler(PNSLR_Path libSearchDir, PNSLR_Allocator tempAllocator)
+struct MZNT_Internal_ShaderCompiler
+{
+    PNSLR_DynamicLibrary lib;
+    PNSLR_Allocator      allocator;
+    IDxcUtils*           dxcUtils;
+    IDxcCompiler3*       dxcCompiler;
+    IDxcIncludeHandler*  dxcIncludeHandler;
+};
+
+MZNT_ShaderCompiler MZNT_CreateShaderCompiler(MZNT_ShaderCompilerConfiguration cfg, PNSLR_Allocator tempAllocator)
 {
     #if PNSLR_WINDOWS
     utf8str libName = PNSLR_StringLiteral("dxcompiler.dll");
@@ -11,30 +20,37 @@ MZNT_Internal_ShaderCompiler MZNT_Internal_CreateShaderCompiler(PNSLR_Path libSe
     {
         libName = libName;
         PNSLR_LogW(PNSLR_StringLiteral("shader compiler unsupported on the current platform"), PNSLR_GET_LOC());
-        return MZNT_Internal_ShaderCompiler { };
+        return MZNT_ShaderCompiler { };
     }
     #endif
 
     #if PNSLR_WINDOWS || PNSLR_LINUX
     {
-        if (!libSearchDir.path.count || !libSearchDir.path.data)
-            return MZNT_Internal_ShaderCompiler { };
+        if (!cfg.libSearchDir.path.count || !cfg.libSearchDir.path.data)
+            return MZNT_ShaderCompiler { };
 
-        PNSLR_Path library = PNSLR_GetPathForChildFile(libSearchDir, libName, tempAllocator);
+        PNSLR_Path library = PNSLR_GetPathForChildFile(cfg.libSearchDir, libName, tempAllocator);
 
-        MZNT_Internal_ShaderCompiler output = { };
+        MZNT_Internal_ShaderCompiler* outputPtr = Panshilar::NewT<MZNT_Internal_ShaderCompiler>(cfg.allocator, PNSLR_GET_LOC());
+        if (!outputPtr) return MZNT_ShaderCompiler { };
+
+        MZNT_Internal_ShaderCompiler& output = *outputPtr;
+
         output.lib = PNSLR_LoadDynamicLibrary(library);
         if (!output.lib.handle)
         {
             PNSLR_LogEf(PNSLR_StringLiteral("could not load $"), PNSLR_FmtArgs(PNSLR_FmtString(library.path)), PNSLR_GET_LOC());
-            return output;
+            Panshilar::DeleteT(outputPtr, cfg.allocator, PNSLR_GET_LOC());
+            return MZNT_ShaderCompiler { };
         }
 
         DxcCreateInstanceProc createInstance = (DxcCreateInstanceProc) PNSLR_GetDynamicLibraryFunction(output.lib, PNSLR_StringLiteral("DxcCreateInstance"));
         if (!createInstance)
         {
             PNSLR_LogEf(PNSLR_StringLiteral("failed to load shader instance creation function from $"), PNSLR_FmtArgs(PNSLR_FmtString(library.path)), PNSLR_GET_LOC());
-            return output;
+            PNSLR_UnloadDynamicLibrary(output.lib);
+            Panshilar::DeleteT(outputPtr, cfg.allocator, PNSLR_GET_LOC());
+            return MZNT_ShaderCompiler { };
         }
 
         if (!SUCCEEDED(createInstance(CLSID_DxcUtils, IID_PPV_ARGS(&output.dxcUtils))))
@@ -45,19 +61,25 @@ MZNT_Internal_ShaderCompiler MZNT_Internal_CreateShaderCompiler(PNSLR_Path libSe
 
         output.dxcUtils->CreateDefaultIncludeHandler(&output.dxcIncludeHandler);
 
-        return output;
+        return MZNT_ShaderCompiler { outputPtr };
     }
     #endif
 }
 
-void MZNT_Internal_DestroyShaderCompiler(MZNT_Internal_ShaderCompiler c, PNSLR_Allocator tempAllocator)
+void MZNT_DestroyShaderCompiler(MZNT_ShaderCompiler compiler, PNSLR_Allocator tempAllocator)
 {
     #if PNSLR_WINDOWS || PNSLR_LINUX
     {
+        if (!compiler.handle) return;
+
+        MZNT_Internal_ShaderCompiler& c = *(MZNT_Internal_ShaderCompiler*) compiler.handle;
+
         if (c.dxcIncludeHandler) c.dxcIncludeHandler->Release();
         if (c.dxcCompiler) c.dxcCompiler->Release();
         if (c.dxcUtils) c.dxcUtils->Release();
         if (c.lib.handle) PNSLR_UnloadDynamicLibrary(c.lib);
+
+        Panshilar::DeleteT(&c, c.allocator, PNSLR_GET_LOC());
     }
     #endif
 }

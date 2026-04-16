@@ -142,8 +142,6 @@ MZNT_DirectX12Renderer* MZNT_CreateRenderer_DirectX12(MZNT_RendererConfiguration
     allocDesc.pAdapter = output->adapter;
     MZNT_INTERNAL_DX12_CHECKED_CALL(D3D12MA::CreateAllocator(&allocDesc, &(output->d3d12maAllocator)));
 
-    output->shaderCompiler = MZNT_Internal_CreateShaderCompiler(config.shaderCompilerLibraryDir, tempAllocator);
-
     return output;
 }
 
@@ -174,8 +172,6 @@ b8 MZNT_DestroyRenderer_DirectX12(MZNT_DirectX12Renderer* renderer, PNSLR_Alloca
     if (!renderer) return false;
 
     MZNT_WaitTillRendererIdle_DirectX12(renderer);
-
-    MZNT_Internal_DestroyShaderCompiler(renderer->shaderCompiler, tempAllocator);
 
     renderer->d3d12maAllocator->Release();
 

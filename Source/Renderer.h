@@ -25,6 +25,18 @@ ENUM_START(MZNT_TextureFormat, u8)
 ENUM_END
 
 /**
+ * Defines the types of shaders that are supported by this library.
+ */
+ENUM_START(MZNT_ShaderType, u8)
+    #define MZNT_ShaderType_Unknown  ((MZNT_ShaderType) 0)
+    #define MZNT_ShaderType_Compute  ((MZNT_ShaderType) 1)
+    #define MZNT_ShaderType_Vertex   ((MZNT_ShaderType) 2)
+    #define MZNT_ShaderType_Mesh     ((MZNT_ShaderType) 3)
+    #define MZNT_ShaderType_Task     ((MZNT_ShaderType) 4)
+    #define MZNT_ShaderType_Fragment ((MZNT_ShaderType) 5)
+ENUM_END
+
+/**
  * Represents an opaque handle to the application instance.
  * Matches Dvaarpaal's app handle.
  * - On Windows, this is an HINSTANCE.
@@ -57,7 +69,6 @@ typedef struct MZNT_RendererConfiguration
     MZNT_AppHandle    appHandle;
     PNSLR_Allocator   allocator;
     utf8str           appName;
-    PNSLR_Path        shaderCompilerLibraryDir;
 } MZNT_RendererConfiguration;
 
 /**
