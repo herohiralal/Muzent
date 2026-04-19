@@ -30,9 +30,9 @@ ENUM_END
 ENUM_START(MZNT_ShaderType, u8)
     #define MZNT_ShaderType_Unknown  ((MZNT_ShaderType) 0)
     #define MZNT_ShaderType_Compute  ((MZNT_ShaderType) 1)
-    #define MZNT_ShaderType_Vertex   ((MZNT_ShaderType) 2)
+    #define MZNT_ShaderType_Task     ((MZNT_ShaderType) 2)
     #define MZNT_ShaderType_Mesh     ((MZNT_ShaderType) 3)
-    #define MZNT_ShaderType_Task     ((MZNT_ShaderType) 4)
+    #define MZNT_ShaderType_Vertex   ((MZNT_ShaderType) 4)
     #define MZNT_ShaderType_Fragment ((MZNT_ShaderType) 5)
 ENUM_END
 

@@ -83,3 +83,130 @@ void MZNT_DestroyShaderCompiler(MZNT_ShaderCompiler compiler, PNSLR_Allocator te
     }
     #endif
 }
+
+b8 CompileShader(MZNT_ShaderCompiler compiler, PNSLR_Path file, PNSLR_ArraySlice(u8)* output, MZNT_ShaderCompilationOptions options)
+{
+    #if PNSLR_WINDOWS || PNSLR_LINUX
+    {
+        if (!compiler.handle)
+            return false;
+
+        if (!file.path.count || !file.path.data)
+            return false;
+
+        MZNT_Internal_ShaderCompiler& c = *(MZNT_Internal_ShaderCompiler*) compiler.handle;
+
+        ArraySlice<u16> fileW = PNSLR_UTF16FromUTF8WindowsOnly(file.path, options.tempAllocator);
+
+        IDxcBlobEncoding* srcBlob = nil;
+        {
+            u32 codePage = DXC_CP_ACP;
+            if (FAILED(c.dxcUtils->LoadFile((WCHAR*) fileW.data, &codePage, &srcBlob)))
+            {
+                return false;
+            }
+        }
+
+        ArraySlice<LPCWSTR> args = { };
+        Panshilar::ResizeSliceT(&args, 30, true, options.tempAllocator, PNSLR_GET_LOC());
+        u32 argsIt = 0;
+
+        args.data[argsIt++] = (LPCWSTR) fileW.data; // must be the first one, this name will be shown in errors
+
+        args.data[argsIt++] = L"-T";
+        b8 useMeshShaderExt = false;
+        switch (options.shaderType)
+        {
+            case MZNT_ShaderType_Compute:   args.data[argsIt++] = L"cs_6_0";                          break;
+            case MZNT_ShaderType_Task:      args.data[argsIt++] = L"as_6_5"; useMeshShaderExt = true; break;
+            case MZNT_ShaderType_Mesh:      args.data[argsIt++] = L"ms_6_5"; useMeshShaderExt = true; break;
+            case MZNT_ShaderType_Vertex:    args.data[argsIt++] = L"vs_6_0";                          break;
+            case MZNT_ShaderType_Fragment:  args.data[argsIt++] = L"ps_6_0";                          break;
+            default:
+            {
+                PNSLR_LogE(PNSLR_StringLiteral("unknown shader type!"), PNSLR_GET_LOC());
+                srcBlob->Release();
+                return false;
+            }
+        }
+
+        args.data[argsIt++] = L"-E";
+        if (options.entryPoint.data && options.entryPoint.count)
+        {
+            args.data[argsIt++] = (const WCHAR*) PNSLR_UTF16FromUTF8WindowsOnly(options.entryPoint, options.tempAllocator).data;
+        }
+        else
+        {
+            args.data[argsIt++] = L"main";
+        }
+
+        if (options.rendererType == MZNT_RendererType_Vulkan)
+        {
+            args.data[argsIt++] = L"-spirv";
+            args.data[argsIt++] = L"-fspv-target-env=vulkan1.3";
+            if (useMeshShaderExt) { args.data[argsIt++] = L"-fspv-extension=SPV_EXT_mesh_shader"; }
+        }
+
+        if (((i64) argsIt) >= args.count)
+        {
+            FORCE_DBG_TRAP;
+        }
+
+        DxcBuffer buffer = DxcBuffer { };
+        {
+            buffer.Ptr      = srcBlob->GetBufferPointer();
+            buffer.Size     = srcBlob->GetBufferSize();
+            buffer.Encoding = DXC_CP_ACP;
+        }
+
+        IDxcResult* result = nil;
+        IDxcBlob* output2 = nil;
+        HRESULT tempRes = 0;
+        if (FAILED(c.dxcCompiler->Compile(&buffer, args.data, argsIt, c.dxcIncludeHandler, IID_PPV_ARGS(&result))) // compile fn returned fail
+            || !result // result is still null
+            || FAILED(result->GetStatus(&tempRes)) // failed to get the result value of the result... (el stupido)
+            || FAILED(tempRes) // the result of the result says failed...
+            || FAILED(result->GetResult(&output2)) // failed to get output from result...
+            || !output2
+            || false)
+        {
+            if (result)
+            {
+                IDxcBlobEncoding* error = nil;
+                if (SUCCEEDED(result->GetErrorBuffer(&error)) && error)
+                {
+                    cstring errorStr = (cstring) error->GetBufferPointer();
+                    PNSLR_LogEf(PNSLR_StringLiteral("Shader compiler error: $"), PNSLR_FmtArgs(PNSLR_FmtCString(errorStr)), PNSLR_GET_LOC());
+                }
+
+                if (error) error->Release();
+            }
+
+            if (output2) output2->Release();
+            if (result) result->Release();
+            srcBlob->Release();
+            return false;
+        }
+
+        PNSLR_ArraySlice(u8) tempOutput = { };
+        tempOutput.data  = (u8*) output2->GetBufferPointer();
+        tempOutput.count = (i64) output2->GetBufferSize();
+
+        if (output)
+        {
+            *output = PNSLR_MakeSlice(u8, tempOutput.count, false, options.allocator, PNSLR_GET_LOC(), nil);
+            PNSLR_MemCopy(output->data, tempOutput.data, (i32) tempOutput.count);
+        }
+
+        output2->Release();
+        result->Release();
+        srcBlob->Release();
+        return true;
+    }
+    #else
+    {
+        PNSLR_LogE(PNSLR_StringLiteral("unsupported shader compiler platform!"), PNSLR_GET_LOC());
+        return false;
+    }
+    #endif
+}
