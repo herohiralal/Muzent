@@ -2,26 +2,6 @@
 #include "Dx12Fns.h"
 #if MZNT_DX12
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleVS
-#include "../Shaders/HelloTriangle/HelloTriangle.vert.dxil.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleMS
-#include "../Shaders/HelloTriangle/HelloTriangle.mesh.dxil.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12HelloTriangleFS
-#include "../Shaders/HelloTriangle/HelloTriangle.frag.dxil.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitVS
-#include "../Shaders/FullScreenBlit/FullScreenBlit.vert.dxil.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_Dx12FullScreenBlitFS
-#include "../Shaders/FullScreenBlit/FullScreenBlit.frag.dxil.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12ColourAttchFormat  = DXGI_FORMAT_R16G16B16A16_FLOAT;
 static const DXGI_FORMAT k_MZNT_Internal_PreferredDx12DepthAttchFormat   = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
 

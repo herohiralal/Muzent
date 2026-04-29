@@ -2,25 +2,6 @@
 #include "VkFns.h"
 #if MZNT_VULKAN
 
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleVS
-#include "../Shaders/HelloTriangle/HelloTriangle.vert.spv.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleMS
-#include "../Shaders/HelloTriangle/HelloTriangle.mesh.spv.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkHelloTriangleFS
-#include "../Shaders/HelloTriangle/HelloTriangle.frag.spv.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullScreenBlitVS
-#include "../Shaders/FullScreenBlit/FullScreenBlit.vert.spv.c"
-#undef INLINED_FILE_INCLUSION_NAME
-
-#define INLINED_FILE_INCLUSION_NAME k_MZNT_Internal_VkFullScreenBlitFS
-#include "../Shaders/FullScreenBlit/FullScreenBlit.frag.spv.c"
-
 // returns number of unique queues
 static PNSLR_ArraySlice(VkDeviceQueueCreateInfo) MZNT_Internal_SelectVkQueueFamilies(VkPhysicalDevice physDev, VkSurfaceKHR surfaceToPresent, u32* gfxQueue, u32* presQueue, PNSLR_Allocator tempAllocator)
 {
